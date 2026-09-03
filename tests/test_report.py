@@ -1,7 +1,7 @@
 import pytest
 
-from encinorm_report import Chart, Detail, Group, Kpi, Pivot, Report, ReportResult
-from encinorm_report.expressions import ExpressionError, evaluate
+from encino_rpt import Chart, Detail, Group, Kpi, Pivot, Report, ReportResult
+from encino_rpt.expressions import ExpressionError, evaluate
 
 
 # --- evaluador de expresiones ---

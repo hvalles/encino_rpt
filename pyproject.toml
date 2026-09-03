@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["encinorm_report"]
+packages = ["encino_rpt"]
 
 [project]
-name = "encinorm-report"
+name = "encino-rpt"
 version = "0.1.0"
-description = "Reporteador financiero sobre list[dict] (encinorm_report)"
+description = "Reporteador financiero sobre list[dict] (encino_rpt)"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [

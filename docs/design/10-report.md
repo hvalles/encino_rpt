@@ -1,4 +1,4 @@
-# Documento de Diseño — Reporteador financiero (`encinorm-report`)
+# Documento de Diseño — Reporteador financiero (`encino-rpt`)
 
 Este documento diseña un **reporteador de tipo financiero** a partir del análisis
 de `prompts/analisys-10.md`: un motor de agregación y presentación que consume
@@ -8,7 +8,7 @@ a HTML, Excel, CSV, PDF y texto.
 
 > Complementa `docs/design/1-model.md` (sección `QueryBuilder`) y es **aditivo**:
 > no modifica `Db`, `Query` ni `QueryBuilder`. Se diseña como **proyecto
-> separado** (`encinorm-report`, módulo `encinorm_report`), con integración
+> separado** (`encino-rpt`, módulo `encino_rpt`), con integración
 > opcional con `encinorm` (véase §10).
 
 ---
@@ -65,7 +65,7 @@ lleva un **discriminador de tipo**; las celdas pueden ser escalares o
 descriptores `Link`/`Image`.
 
 ```python
-# encinorm_report/models.py
+# encino_rpt/models.py
 from typing import Any, Literal, Union
 from pydantic import BaseModel, Field
 
@@ -217,7 +217,7 @@ API fluida corregida respecto al boceto de `prompts/24.md` (consistencia de
 acceso, kwargs, y sintaxis de plantillas).
 
 ```python
-# encinorm_report/report.py
+# encino_rpt/report.py
 class Report:
     def __init__(self, rows: list[dict], params: list | None = None, title: str | None = None):
         self._rows = list(rows)
@@ -339,7 +339,7 @@ class Report:
 La `Section` agrupa las piezas de presentación de un corte:
 
 ```python
-# encinorm_report/section.py
+# encino_rpt/section.py
 class Section:
     def header(self, template: str) -> "Section": ...
     def footer(self, template: str, column_position: str | None = None) -> "Section": ...
@@ -416,7 +416,7 @@ class Section:
 
 ```python
 from encinorm import Query
-from encinorm_report import Report
+from encino_rpt import Report
 
 res = await db.fetch_all(Query(
     "select a.id, a.nombre as agente, p.id as pedido_id, p.referencia, p.fecha, "
@@ -532,7 +532,7 @@ rep.kpi("Ticket promedio", operator="avg", column="total")
 Prohibido `eval`. Se usa `ast.parse(mode="eval")` con un *whitelist* estricto:
 
 ```python
-# encinorm_report/expressions.py
+# encino_rpt/expressions.py
 import ast, operator
 
 _BINOPS = {
@@ -627,7 +627,7 @@ las plantillas `header`/`footer` con acceso a los totales del grupo. Por eso
 Implementación trivial:
 
 ```python
-# encinorm_report/template.py
+# encino_rpt/template.py
 import re
 _TOKEN = re.compile(r"\{\{([a-zA-Z_][a-zA-Z0-9_.]*)\}\}")
 
@@ -735,7 +735,7 @@ El `ReportResult` es el contrato; cada renderer lo recorre. `render_html` y
 `to_*` son métodos de conveniencia sobre `ReportResult` que delegan en clases.
 
 ```python
-# encinorm_report/renderers.py
+# encino_rpt/renderers.py
 class HtmlRenderer:
     def __init__(self, classes: dict | None = None): ...
     def render(self, result: ReportResult) -> str: ...
@@ -757,7 +757,7 @@ class PdfRenderer:
 imports perezosos (para no cargar dependencias opcionales):
 
 ```python
-# encinorm_report/models.py (métodos sobre ReportResult)
+# encino_rpt/models.py (métodos sobre ReportResult)
 class ReportResult(BaseModel):
     ...
     def render_html(self, classes: dict | None = None, repeat_header: bool = False) -> str: ...   # HtmlRenderer
@@ -810,9 +810,9 @@ Mapeo de nodos y celdas por destino:
 ## 9. Nombres y estructura del paquete
 
 ```
-encinorm-report/
+encino-rpt/
   pyproject.toml
-  encinorm_report/
+  encino_rpt/
     __init__.py        # Report, ReportResult, renderers
     models.py          # Link, Image, Format, Total, Series, Chart, Pivot, ConditionalRule, Kpi, Detail, Group, ReportMeta, ReportResult
     report.py          # Report (builder)
@@ -841,11 +841,11 @@ tiene dependencias (solo `pydantic`).
 
 ## 10. Integración con encinorm
 
-Opcional y en una sola dirección (`encinorm-report` → `encinorm`):
+Opcional y en una sola dirección (`encino-rpt` → `encinorm`):
 
 ```python
 from encinorm import Query
-from encinorm_report import Report
+from encino_rpt import Report
 
 rows = await db.fetch_all(Query(sql, params))
 result = Report(rows, params=params).group("global").run()
@@ -863,7 +863,7 @@ result = Report(rows, params=params).group("global").run()
 
 | # | Punto | Decisión |
 |---|-------|----------|
-| 1 | Ubicación | **Proyecto separado** `encinorm-report`. Alternativa aceptable: subpaquete `encinorm.report` opcional. |
+| 1 | Ubicación | **Proyecto separado** `encino-rpt`. Alternativa aceptable: subpaquete `encinorm.report` opcional. |
 | 2 | Retorno | **JSON canónico** (`ReportResult`) como dato; HTML/Excel/PDF como renderers opcionales. |
 | 3 | Evaluador | Parser `ast` con whitelist; **nunca** `eval`. |
 | 4 | Plantillas | Sintaxis `{{campo}}` / `{{param.N}}` propia; sin colisión con `{0}`. |

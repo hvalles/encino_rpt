@@ -1,8 +1,8 @@
 import pytest
 
-from encinorm_report import Report
-from encinorm_report.models import Format
-from encinorm_report.renderers._format import format_value
+from encino_rpt import Report
+from encino_rpt.models import Format
+from encino_rpt.renderers._format import format_value
 
 
 def test_format_value_currency():
