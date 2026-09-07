@@ -7,7 +7,7 @@ packages = ["encino_rpt"]
 
 [project]
 name = "encino-rpt"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reporteador financiero sobre list[dict] (encino_rpt)"
 requires-python = ">=3.10"
 license = "MIT"
@@ -15,6 +15,7 @@ authors = [
     { name = "Hector", email = "valles.hector@gmail.com" },
 ]
 dependencies = [
+    "encino-orm>=0.2.1",
     "pydantic>=2",
 ]
 
@@ -23,7 +24,7 @@ excel = ["openpyxl"]
 pdf = ["reportlab"]
 
 [project.urls]
-Repository = "https://github.com/hvalles/encinorm"
+Repository = "https://github.com/hvalles/encino_rpt"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

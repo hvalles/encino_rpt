@@ -78,6 +78,8 @@ class PdfRenderer:
             spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
 
     def _full(self, text, rows, spans, ncols):
+        from reportlab.platypus import Paragraph
+
         rows.append([Paragraph(f"<b>{_esc(text)}</b>", self._normal)])
         spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
 
