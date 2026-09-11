@@ -314,7 +314,7 @@ wheels = [
 
 [[package]]
 name = "encino-orm"
-version = "0.2.5"
+version = "0.2.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiomysql" },
@@ -322,9 +322,9 @@ dependencies = [
     { name = "asyncpg" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/9e/953687e44f5c5c2655e6a509d1b138768d8a12f6764d31803932ea87540f/encino_orm-0.2.5.tar.gz", hash = "sha256:0ad190906db8afb83362936cd37ffa190f6e3ba1309edbb21d17890d5f8ac99c", size = 285981, upload-time = "2026-09-11T13:24:05.712Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/9f/c4f46aec140a46ec315cfc799586291b448c60a22989682815f971ed7ec3/encino_orm-0.2.6.tar.gz", hash = "sha256:b7ab93e5f460f5439b0a2ccfe9ef854fa0faf7591c4f5d75413e511c476cfdd2", size = 286055, upload-time = "2026-09-11T20:45:29.747Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/06/9a/c0822e8f95334a39608219904d679a6b8b50ee342097c5f888deb2666b2a/encino_orm-0.2.5-py3-none-any.whl", hash = "sha256:8ea573b426fbd463634fbbd05125f199d13a2060661e13b60cbf65915f8bfe1f", size = 88929, upload-time = "2026-09-11T13:24:04.746Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/85/0ad8562f894cbb40f607fc9c9830ee29f7acaa06c54658ce5ef56c832832/encino_orm-0.2.6-py3-none-any.whl", hash = "sha256:3f22943daf018da36e8c767b334ccf9bfc16310e86052f591a9134b0341ee8ec", size = 88915, upload-time = "2026-09-11T20:45:28.593Z" },
 ]
 
 [[package]]
