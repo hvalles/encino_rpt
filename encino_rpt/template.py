@@ -18,7 +18,12 @@ def render(template: str, ctx: dict, params: list | None = None) -> str:
     def repl(match: re.Match) -> str:
         token = match.group(1)
         if token.startswith("param."):
-            index = int(token.split(".", 1)[1])
+            suffix = token.split(".", 1)[1]
+            if not suffix.isdigit():
+                raise ValueError(f"índice de parámetro inválido: {token!r}")
+            index = int(suffix)
+            if index < 0 or index >= len(params):
+                raise IndexError(f"parámetro {index} fuera de rango (hay {len(params)})")
             return str(params[index])
         return str(ctx.get(token, ""))
 

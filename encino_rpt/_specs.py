@@ -94,4 +94,4 @@ class GroupSpec:
     order_by: dict | None = None
     top_n: int | None = None
     suppress_zero: dict | None = None
-    children: list["GroupSpec"] = field(default_factory=list)
+    children: list[GroupSpec] = field(default_factory=list)

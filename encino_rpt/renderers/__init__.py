@@ -6,4 +6,4 @@ from .html import HtmlRenderer
 from .pdf import PdfRenderer
 from .text import TextRenderer
 
-__all__ = ["TextRenderer", "CsvRenderer", "HtmlRenderer", "ExcelRenderer", "PdfRenderer"]
+__all__ = ["CsvRenderer", "ExcelRenderer", "HtmlRenderer", "PdfRenderer", "TextRenderer"]

@@ -7,7 +7,17 @@ from ._format import format_value
 
 
 class TextRenderer:
+    """Renderiza el `ReportResult` a texto plano (para inspección)."""
+
     def render(self, result) -> str:
+        """Convierte el resultado a texto plano.
+
+        Args:
+            result: El `ReportResult` a renderizar.
+
+        Returns:
+            El texto como cadena.
+        """
         lines = []
         for kpi in result.kpis:
             lines.append(f"{kpi.label}: {format_value(kpi.value, kpi.format)}")

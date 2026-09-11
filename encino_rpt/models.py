@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -61,6 +61,8 @@ class Detail(BaseModel):
 
 
 class Series(BaseModel):
+    """Serie de un gráfico (una línea/barra/sector)."""
+
     label: str | None = None
     values: list[Any] = Field(default_factory=list)
 
@@ -116,7 +118,7 @@ class Group(BaseModel):
     default_collapsed: bool = False
     page_break: bool = False
     totals: list[Total] = Field(default_factory=list)
-    children: list[Union[Detail, Group, Chart, Pivot]] = Field(default_factory=list)
+    children: list[Detail | Group | Chart | Pivot] = Field(default_factory=list)
 
     # Contexto interno (no serializado) para renderizar header/footer en la fase final.
     _first_row: dict = PrivateAttr(default_factory=dict)
@@ -125,11 +127,19 @@ class Group(BaseModel):
 
 
 class ReportMeta(BaseModel):
+    """Metadatos del reporte (título y parámetros de la consulta)."""
+
     title: str | None = None
     params: list[Any] = Field(default_factory=list)
 
 
 class ReportResult(BaseModel):
+    """Árbol canónico del reporte (dato puro, serializable a JSON).
+
+    Expone métodos de conveniencia (`render_html`, `to_csv`, `to_text`,
+    `to_excel`, `to_pdf`) que delegan en los renderers sin modificar el árbol.
+    """
+
     meta: ReportMeta = Field(default_factory=ReportMeta)
     columns: list[str] = Field(default_factory=list)
     formats: dict[str, Format] = Field(default_factory=dict)
@@ -138,26 +148,67 @@ class ReportResult(BaseModel):
     root: Group
 
     def render_html(self, classes: dict | None = None, repeat_header: bool = False) -> str:
+        """Renderiza el reporte a una tabla HTML.
+
+        Args:
+            classes: Mapa de clases CSS por tipo de fila (`group`, `total`, ...).
+            repeat_header: Repetir el encabezado de columnas.
+
+        Returns:
+            El HTML como cadena.
+        """
         from .renderers.html import HtmlRenderer
 
         return HtmlRenderer(classes=classes, repeat_header=repeat_header).render(self)
 
     def to_csv(self, delimiter: str = ",") -> str:
+        """Renderiza el reporte a CSV (aplanado).
+
+        Args:
+            delimiter: Delimitador de campos.
+
+        Returns:
+            El CSV como cadena.
+        """
         from .renderers.csv import CsvRenderer
 
         return CsvRenderer(delimiter=delimiter).render(self)
 
     def to_text(self) -> str:
+        """Renderiza el reporte a texto plano (para inspección).
+
+        Returns:
+            El texto como cadena.
+        """
         from .renderers.text import TextRenderer
 
         return TextRenderer().render(self)
 
     def to_excel(self, ws=None, styles: dict | None = None, formulas: bool = False):
+        """Renderiza el reporte a una hoja de Excel (openpyxl).
+
+        Args:
+            ws: Hoja existente (None = crea un workbook nuevo).
+            styles: Estilos adicionales.
+            formulas: Emitir `=SUM(...)` para totales `sum` en lugar del valor.
+
+        Returns:
+            La hoja (`Worksheet`) con el contenido.
+        """
         from .renderers.excel import ExcelRenderer
 
         return ExcelRenderer(styles=styles, formulas=formulas).render(self, ws=ws)
 
     def to_pdf(self, *, repeat_header: bool = True, **opts) -> bytes:
+        """Renderiza el reporte a PDF (reportlab).
+
+        Args:
+            repeat_header: Repetir el encabezado de columnas en cada página.
+            **opts: Opciones adicionales para `SimpleDocTemplate`.
+
+        Returns:
+            Los bytes del PDF.
+        """
         from .renderers.pdf import PdfRenderer
 
         return PdfRenderer().render(self, repeat_header=repeat_header, **opts)

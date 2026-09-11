@@ -10,12 +10,32 @@ from ._format import format_value
 
 
 class PdfRenderer:
+    """Renderiza el `ReportResult` a un PDF (reportlab)."""
+
     def render(self, result, repeat_header: bool = True, **opts) -> bytes:
+        """Convierte el resultado a PDF.
+
+        Args:
+            result: El `ReportResult` a renderizar.
+            repeat_header: Repetir el encabezado de columnas en cada página.
+            **opts: Opciones adicionales para `SimpleDocTemplate`.
+
+        Returns:
+            Los bytes del PDF.
+
+        Raises:
+            ImportError: Si `reportlab` no está instalado.
+        """
         try:
             from reportlab.lib import colors
             from reportlab.lib.pagesizes import A4
             from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
+            from reportlab.platypus import (
+                Paragraph,
+                SimpleDocTemplate,
+                Table,
+                TableStyle,
+            )
         except ImportError as exc:  # pragma: no cover - depende del entorno
             raise ImportError("reportlab no está instalado; instala el extra `pdf`") from exc
 
@@ -35,7 +55,6 @@ class PdfRenderer:
         spans = []
         self._collect(result.root, result, rows, spans)
 
-        ncols = len(result.columns) or 1
         if result.columns:
             header = [Paragraph(f"<b>{_esc(c)}</b>", styles["Normal"]) for c in result.columns]
         else:

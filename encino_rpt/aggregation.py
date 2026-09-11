@@ -5,8 +5,17 @@ from __future__ import annotations
 from ._specs import GroupSpec
 from .charts import build_chart
 from .expressions import evaluate
-from .models import (Chart, Detail, Format, Group, Image, Kpi, Link, Pivot,
-                     ReportMeta, ReportResult, Total)
+from .models import (
+    Detail,
+    Format,
+    Group,
+    Image,
+    Kpi,
+    Link,
+    ReportMeta,
+    ReportResult,
+    Total,
+)
 from .pivot import build_pivot
 from .template import render as render_template
 

@@ -41,6 +41,11 @@ _FUNCTIONS = {
     "BETWEEN": lambda x, lo, hi: 1 if lo <= x <= hi else 0,
 }
 
+# Límites anti-DoS (expresiones no confiables).
+_MAX_NODES = 1000
+_MAX_DEPTH = 100
+_MAX_POW_EXP = 10000
+
 
 class ExpressionError(ValueError):
     """Error al evaluar una expresión (p. ej. nombre desconocido o tipo inválido)."""
@@ -50,10 +55,14 @@ def evaluate(expr: str, row: dict, functions: dict | None = None) -> Any:
     """Evalúa `expr` sobre `row` y las funciones extra (fusionadas con `_FUNCTIONS`)."""
     merged = {**_FUNCTIONS, **(functions or {})}
     tree = ast.parse(expr, mode="eval")
+    if sum(1 for _ in ast.walk(tree)) > _MAX_NODES:
+        raise ExpressionError("expresión demasiado compleja")
     return _walk(tree.body, row, merged)
 
 
-def _walk(node, row: dict, functions: dict) -> Any:
+def _walk(node, row: dict, functions: dict, depth: int = 0) -> Any:
+    if depth > _MAX_DEPTH:
+        raise ExpressionError("expresión demasiado anidada")
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, ast.Name):
@@ -66,19 +75,23 @@ def _walk(node, row: dict, functions: dict) -> Any:
         op = _BINOPS.get(type(node.op))
         if op is None:
             raise ExpressionError(f"operador no permitido: {ast.dump(node)}")
-        return op(_walk(node.left, row, functions), _walk(node.right, row, functions))
+        left = _walk(node.left, row, functions, depth + 1)
+        right = _walk(node.right, row, functions, depth + 1)
+        if isinstance(node.op, ast.Pow) and isinstance(right, int) and abs(right) > _MAX_POW_EXP:
+            raise ExpressionError("exponente demasiado grande")
+        return op(left, right)
     if isinstance(node, ast.UnaryOp):
         op = _UNARY.get(type(node.op))
         if op is None:
             raise ExpressionError(f"operador no permitido: {ast.dump(node)}")
-        return op(_walk(node.operand, row, functions))
+        return op(_walk(node.operand, row, functions, depth + 1))
     if isinstance(node, ast.Compare):
-        left = _walk(node.left, row, functions)
+        left = _walk(node.left, row, functions, depth + 1)
         for op_node, comparator in zip(node.ops, node.comparators):
             op = _CMP.get(type(op_node))
             if op is None:
                 raise ExpressionError(f"comparación no permitida: {ast.dump(node)}")
-            right = _walk(comparator, row, functions)
+            right = _walk(comparator, row, functions, depth + 1)
             if not op(left, right):
                 return False
             left = right
@@ -91,6 +104,6 @@ def _walk(node, row: dict, functions: dict) -> Any:
             raise ExpressionError(f"función no permitida: {node.func.id!r}")
         if node.keywords:
             raise ExpressionError("argumentos por nombre no permitidos")
-        args = [_walk(a, row, functions) for a in node.args]
+        args = [_walk(a, row, functions, depth + 1) for a in node.args]
         return fn(*args)
     raise ExpressionError(f"expresión no permitida: {ast.dump(node)}")

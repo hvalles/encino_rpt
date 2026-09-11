@@ -1,6 +1,6 @@
 import pytest
 
-from encino_rpt import Chart, Detail, Group, Kpi, Pivot, Report, ReportResult
+from encino_rpt import Chart, Detail, Pivot, Report, ReportResult
 from encino_rpt.expressions import ExpressionError, evaluate
 
 

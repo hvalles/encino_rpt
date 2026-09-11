@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..models import Chart, Detail, Group, Pivot
 from ._format import excel_number_format
+from ._sanitize import write_excel_cell
 
 _COLOR_OPS = {
     "lt": lambda a, b: a < b,
@@ -16,11 +17,27 @@ _COLOR_OPS = {
 
 
 class ExcelRenderer:
+    """Renderiza el `ReportResult` a una hoja de Excel (openpyxl)."""
+
     def __init__(self, styles: dict | None = None, formulas: bool = False):
         self.styles = styles or {}
         self.formulas = formulas
 
     def render(self, result, ws=None, styles: dict | None = None, formulas: bool | None = None):
+        """Convierte el resultado a una hoja de Excel.
+
+        Args:
+            result: El `ReportResult` a renderizar.
+            ws: Hoja existente (None = crea un workbook nuevo).
+            styles: Estilos adicionales.
+            formulas: Emitir `=SUM(...)` para totales `sum`.
+
+        Returns:
+            La hoja (`Worksheet`) con el contenido.
+
+        Raises:
+            ImportError: Si `openpyxl` no está instalado.
+        """
         try:
             from openpyxl import Workbook
             from openpyxl.styles import Font
@@ -37,8 +54,8 @@ class ExcelRenderer:
 
         # KPIs
         for kpi in result.kpis:
-            ws.cell(self._row, 1, kpi.label)
-            cell = ws.cell(self._row, 2, kpi.value)
+            write_excel_cell(ws.cell(self._row, 1), kpi.label)
+            cell = write_excel_cell(ws.cell(self._row, 2), kpi.value)
             nf = excel_number_format(kpi.format)
             if nf:
                 cell.number_format = nf
@@ -54,7 +71,6 @@ class ExcelRenderer:
 
     def _walk(self, node):
         ws = self._ws
-        from openpyxl.styles import Font
 
         if isinstance(node, Group):
             if node.header:
@@ -85,7 +101,7 @@ class ExcelRenderer:
         elif isinstance(node, Detail):
             for j, col in enumerate(self._result.columns, start=1):
                 value = node.row.get(col)
-                cell = ws.cell(self._row, j, value)
+                cell = write_excel_cell(ws.cell(self._row, j), value)
                 nf = excel_number_format(self._result.formats.get(col))
                 if nf:
                     cell.number_format = nf
@@ -110,7 +126,7 @@ class ExcelRenderer:
     def _full_row(self, text, bold=False):
         from openpyxl.styles import Font
 
-        cell = self._ws.cell(self._row, 1, text)
+        cell = write_excel_cell(self._ws.cell(self._row, 1), text)
         if bold:
             cell.font = Font(bold=True)
         self._row += 1
@@ -161,12 +177,12 @@ class ExcelRenderer:
         data_start = self._row
         self._ws.cell(self._row, 1, "")
         for j, lab in enumerate(node.labels, start=2):
-            self._ws.cell(self._row, j, lab).font = Font(bold=True)
+            write_excel_cell(self._ws.cell(self._row, j), lab).font = Font(bold=True)
         self._row += 1
         for s in node.series:
-            self._ws.cell(self._row, 1, s.label or "")
+            write_excel_cell(self._ws.cell(self._row, 1), s.label or "")
             for j, v in enumerate(s.values, start=2):
-                self._ws.cell(self._row, j, v)
+                write_excel_cell(self._ws.cell(self._row, j), v)
             self._row += 1
         data_end = self._row - 1
         ncols = max(len(node.labels), 1) + 1
@@ -190,10 +206,10 @@ class ExcelRenderer:
         # encabezado de columnas
         self._ws.cell(self._row, start_col, "").font = Font(bold=True)
         for j, c in enumerate(node.columns, start=start_col + 1):
-            self._ws.cell(self._row, j, c).font = Font(bold=True)
+            write_excel_cell(self._ws.cell(self._row, j), c).font = Font(bold=True)
         self._row += 1
         for i, r in enumerate(node.rows):
-            self._ws.cell(self._row, start_col, r)
+            write_excel_cell(self._ws.cell(self._row, start_col), r)
             for j, v in enumerate(node.cells[i], start=start_col + 1):
-                self._ws.cell(self._row, j, v)
+                write_excel_cell(self._ws.cell(self._row, j), v)
             self._row += 1

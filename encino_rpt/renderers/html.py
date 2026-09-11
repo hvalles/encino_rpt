@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html as _html
+import re as _re
 
 from ..models import Chart, Detail, Group, Pivot
 from ._format import format_value
@@ -16,13 +17,25 @@ _OPS = {
     "ne": lambda a, b: a != b,
 }
 
+_SAFE_PROP = _re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
+
 
 class HtmlRenderer:
+    """Renderiza el `ReportResult` a una tabla HTML con clases y formato condicional."""
+
     def __init__(self, classes: dict | None = None, repeat_header: bool = False):
         self.classes = classes or {}
         self.repeat_header = repeat_header
 
     def render(self, result) -> str:
+        """Convierte el resultado a HTML.
+
+        Args:
+            result: El `ReportResult` a renderizar.
+
+        Returns:
+            La tabla HTML como cadena.
+        """
         parts = ["<table>"]
         if result.columns:
             header = "".join(f"<th>{_esc(c)}</th>" for c in result.columns)
@@ -100,9 +113,12 @@ def _style_attr(style) -> str:
         prop = key.replace("_", "-")
         if key == "bold":
             css.append("font-weight:bold" if val else "")
-        elif val is True:
+            continue
+        if not _SAFE_PROP.match(prop):
+            continue
+        if val is True:
             css.append(prop)
         else:
-            css.append(f"{prop}:{val}")
+            css.append(f"{prop}:{_esc(val)}")
     css = [c for c in css if c]
     return f' style="{";".join(css)}"' if css else ""

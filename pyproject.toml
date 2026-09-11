@@ -7,12 +7,27 @@ packages = ["encino_rpt"]
 
 [project]
 name = "encino-rpt"
-version = "0.1.1"
+version = "0.2.0"
 description = "Reporteador financiero sobre list[dict] (encino_rpt)"
+readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Hector", email = "valles.hector@gmail.com" },
+]
+keywords = ["report", "reporting", "finance", "excel", "csv", "pdf", "pivot", "aggregation", "render"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Spreadsheet",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     "encino-orm>=0.2.1",
@@ -25,6 +40,7 @@ pdf = ["reportlab"]
 
 [project.urls]
 Repository = "https://github.com/hvalles/encino_rpt"
+Documentation = "https://hvalles.github.io/encino_rpt/"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -35,4 +51,10 @@ dev = [
     "pytest>=9.1.1",
     "openpyxl",
     "reportlab",
+    "ruff>=0.16.7",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
 ]
