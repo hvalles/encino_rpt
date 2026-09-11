@@ -7,7 +7,7 @@ packages = ["encino_rpt"]
 
 [project]
 name = "encino-rpt"
-version = "0.2.0"
+version = "0.2.1"
 description = "Reporteador financiero sobre list[dict] (encino_rpt)"
 readme = "README.md"
 requires-python = ">=3.10"
