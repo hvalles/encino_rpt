@@ -73,33 +73,33 @@ Deferred. No en el roadmap actual.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORR-01 | TBD | Pending |
-| CORR-02 | TBD | Pending |
-| CORR-03 | TBD | Pending |
-| CORR-04 | TBD | Pending |
-| CORR-05 | TBD | Pending |
-| CORR-06 | TBD | Pending |
-| CORR-07 | TBD | Pending |
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| FEAT-01 | TBD | Pending |
-| FEAT-02 | TBD | Pending |
-| REF-01 | TBD | Pending |
-| REF-02 | TBD | Pending |
-| DEP-01 | TBD | Pending |
-| JSON-01 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
+| CORR-01 | Phase 2 | Pending |
+| CORR-02 | Phase 1 | Pending |
+| CORR-03 | Phase 2 | Pending |
+| CORR-04 | Phase 1 | Pending |
+| CORR-05 | Phase 1 | Pending |
+| CORR-06 | Phase 3 | Pending |
+| CORR-07 | Phase 3 | Pending |
+| SEC-01 | Phase 2 | Pending |
+| SEC-02 | Phase 1 | Pending |
+| SEC-03 | Phase 4 | Pending |
+| SEC-04 | Phase 3 | Pending |
+| PERF-01 | Phase 5 | Pending |
+| PERF-02 | Phase 5 | Pending |
+| FEAT-01 | Phase 6 | Pending |
+| FEAT-02 | Phase 6 | Pending |
+| REF-01 | Phase 7 | Pending |
+| REF-02 | Phase 7 | Pending |
+| DEP-01 | Phase 1 | Pending |
+| JSON-01 | Phase 6 | Pending |
+| TEST-01 | Phase 8 | Pending |
+| TEST-02 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0 (llenado por roadmap)
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21 (roadmap creado)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-16*
-*Last updated: 2026-09-16 after initial definition*
+*Last updated: 2026-09-16 after roadmap (traceability filled)*
