@@ -52,11 +52,34 @@ Requirements para el hardening + features. Cada uno mapea a una fase del roadmap
 - [x] **TEST-01**: hay tests de regresión para cada uno de los fixes anteriores (idempotencia, precisión, SUM, sanitización, `order_by`, errores con contexto, multi-dataset, Link/Image, jerarquías profundas).
 - [x] **TEST-02**: CI incluye type checker, `ruff format --check`, gate de cobertura y smoke test de rendimiento con entradas grandes.
 
+## v1.1 Requirements
+
+Milestone v1.1: Readers multi-formato + Templates HTML/Markdown.
+
+### Readers
+
+- [ ] **READ-01**: existe un protocolo/ABC `Reader` (`read(source, **opts) -> list[dict]`) y un registro de readers custom (patrón `add_function`/`add_aggregate`).
+- [ ] **READ-02**: readers stdlib incluidos: `csv`, texto delimitado (TSV), `json`, `jsonl`, `tuples` (con `columns=` para mapear posición→nombre).
+- [ ] **READ-03**: reader `excel` (openpyxl) tras el extra `excel`; lanza `ImportError` con hint si falta.
+- [ ] **READ-04**: auto-detección de tipos determinista por celda (`int`→`float`→`bool`→`null`→`str`) con opt-out `coerce=False`; documentado y con test de borde para valores mixtos (p. ej. `"N/A"` queda `str`).
+- [ ] **READ-05**: `Report(rows=...)` y `add_dataset` intactos (compatibilidad total).
+
+### Templates / Markdown
+
+- [ ] **TMPL-01**: `render_html(css=True)` emite clases + bloque `<style>` en vez de `style="…"` inline (opt-in), preservando `_SAFE_PROP`/`_UNSAFE_VALUE`/`_esc`.
+- [ ] **TMPL-02**: `render_html(template=...)` envuelve la tabla en un documento HTML completo (`<head>`+`<style>`+`<body>`).
+- [ ] **TMPL-03**: existe `MarkdownRenderer` + `to_markdown()` (tablas GFM con escapado de `|`/newline, links/imágenes nativos, chart→texto).
+- [ ] **TMPL-04**: sin regresión de inyección CSS/HTML; plantillas solo vía sandbox `template.py` (`{{token}}`), nunca Jinja2 arbitrario.
+
+### Streaming (diferido)
+
+- **STRM-01** *(diferido)*: salida en streaming (`to_csv(file=...)`/iteradores). Entrada en streaming descartada (no-objetivo).
+
 ## v2 Requirements
 
 Deferred. No en el roadmap actual.
 
-- **FEAT-02b**: renderers Markdown/LaTeX — no seleccionado.
+- **FEAT-02b**: renderer LaTeX — no seleccionado.
 - **INTEG-01**: integración oficial con `encinorm` (`fetch_all` → `Report`) — no seleccionado.
 - **CHART-01**: gráficos como imagen server-side (matplotlib) — degradación a tabla por ahora.
 
@@ -66,7 +89,7 @@ Deferred. No en el roadmap actual.
 |---------|--------|
 | Generación de SQL / consulta a BD | El diseño delega agregados pesados a `ROLLUP`/`CUBE` |
 | Motor de agregación server-side | No-objetivo documentado en `docs/design/10-report.md` |
-| Renderers Markdown/LaTeX | No seleccionado |
+| Renderer LaTeX | No seleccionado (Markdown seleccionado en v1.1) |
 | Integración encinorm | No seleccionado (deferido a v2) |
 
 ## Traceability

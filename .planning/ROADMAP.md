@@ -22,6 +22,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Refactor** - Traversal compartido, `GroupSpec` inmutable + validación *(implementación directa)*
 - [x] **Phase 8: Tests & CI** - Tests de regresión consolidados + CI endurecido (completed 2026-09-17)
 
+### Milestone v1.1 — Readers multi-formato + Templates HTML/Markdown
+
+- [ ] **Phase 9: Readers multi-formato** - Protocolo `Reader` + registro; readers stdlib (csv/tsv/json/jsonl/tuples) y `excel`; auto-detección de tipos
+- [ ] **Phase 10: Templates HTML + Markdown** - HTML por clases (sin CSS inline), template de documento, `MarkdownRenderer` + `to_markdown()`
+- *(diferido)* **Streaming de salida** - `to_csv(file=...)`/iteradores (entrada descartada, no-objetivo)
+
 ## Phase Details
 
 ### Phase 1: Quick Wins (Corrección low-risk)
