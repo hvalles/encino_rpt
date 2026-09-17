@@ -139,7 +139,21 @@ Plans:
   2. CI ejecuta type checker, `ruff format --check`, gate de cobertura y smoke test de rendimiento con entradas grandes.
   3. CI pasa end-to-end (todos los checks verdes).
 
-**Plans**: TBD
+**Plans**: 4 planes
+
+Plans:
+**Wave 1**
+
+- [ ] 08-01-PLAN.md — Regresiones TEST-01 en `test_report.py` (7 tests: multi-dataset, suppress_zero, totales None, no-hashable, detail source, count, chart/pivot)
+- [ ] 08-02-PLAN.md — Regresiones renderers/seguridad + smoke de rendimiento 50k filas (TEST-01 + TEST-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-03-PLAN.md — Tooling config (mypy + pytest-cov + secciones `[tool.*]`) + normalización one-time de `ruff format` (TEST-02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 08-04-PLAN.md — CI jobs `test`+`quality`, triage de mypy y verificación end-to-end de gates (TEST-02)
 
 ## Progress
 
@@ -155,4 +169,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Rendimiento | - | Complete (directa) | 2026-09-16 |
 | 6. Features | - | Complete (directa) | 2026-09-16 |
 | 7. Refactor | - | Complete (directa) | 2026-09-16 |
-| 8. Tests & CI | TBD | Not started | - |
+| 8. Tests & CI | 0/4 | Not started | - |
