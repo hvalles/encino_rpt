@@ -575,6 +575,8 @@ def _validate(report):
     for f in report._fields:
         if f.source is not None and f.source not in known:
             raise ValueError(f"source no declarado: {f.source!r}")
+    if report._detail_source is not None and report._detail_source not in known:
+        raise ValueError(f"source no declarado: {report._detail_source!r}")
     for k in report._kpis:
         if k.source is not None and k.source not in known:
             raise ValueError(f"source no declarado: {k.source!r}")
@@ -590,6 +592,15 @@ def build(report) -> ReportResult:
         sources[name] = _enrich(report, name)
 
     root_spec, children_map = _build_group_tree(report)
+    if report._detail_source is not None and children_map:
+        raise ValueError(
+            "`detail(source=...)` no es compatible con grupos; "
+            "usa `group(..., source=...)`"
+        )
+    if report._detail_source is not None:
+        from dataclasses import replace
+
+        root_spec = replace(root_spec, source=report._detail_source)
     registry: dict[str, Any] = {}
     deferred: list[tuple[Total, Any, Any, str]] = []
     root_nodes = _build_group(

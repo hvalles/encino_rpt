@@ -484,11 +484,8 @@ def test_suppress_zero_missing_column():
         rep.run()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug conocido — ver CONCERNS.md §Known Bugs (detail(source=...) ignorado)",
-)
 def test_detail_source_ignored():
+    # CORR-08: `detail(source=...)` a nivel raíz (sin grupos) usa el dataset.
     primary = [{"sku": "A", "monto": 100}]
     secondary = [{"sku": "B", "monto": 999}]
     rep = Report(primary)
@@ -497,6 +494,20 @@ def test_detail_source_ignored():
     result = rep.run()
 
     assert result.root.children[0].row["sku"] == "B"
+
+
+def test_detail_source_with_groups_raises():
+    # CORR-08: `detail(source=...)` combinado con cortes falla con ValueError claro.
+    primary = [{"agente": "Ana", "monto": 100}]
+    secondary = [{"agente": "Bob", "monto": 999}]
+    rep = Report(primary)
+    rep.add_dataset("presupuesto", secondary)
+    rep.detail("agente", "monto", source="presupuesto")
+    rep.group("por_agente", columns="agente")
+    rep.group("global")
+
+    with pytest.raises(ValueError, match="no es compatible con grupos"):
+        rep.run()
 
 
 def test_count_expression_semantics():

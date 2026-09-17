@@ -33,6 +33,7 @@ class Report:
         self._aggregates: dict[str, Any] = {}
         self._fields: list[FieldSpec] = []
         self._detail: list[str] = []
+        self._detail_source: str | None = None
         self._groups: dict[str, GroupSpec] = {}
         self._order: list[str] = []  # orden de declaración de los cortes
         self._formats: dict[str, Format] = {}
@@ -332,12 +333,15 @@ class Report:
 
         Args:
             *columns: Nombres de columna.
-            source: Conjunto de `add_dataset`.
+            source: Conjunto de `add_dataset` para el detalle. Solo aplica a
+                nivel raíz (sin cortes); combinarlo con `group()` lanza
+                `ValueError` en `run()`.
 
         Returns:
             El propio reporte (fluido).
         """
         self._detail = list(columns)
+        self._detail_source = source
         return self
 
     def group(
