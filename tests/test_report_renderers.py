@@ -95,6 +95,104 @@ def test_html_renderer_and_styles():
     assert "color:red" in html_out
 
 
+# --- HTML modo clases (TMPL-01) ---
+def test_html_css_mode_no_inline_style():
+    rows = [{"total": -5}, {"total": 10}]
+    rep = Report(rows)
+    rep.detail("total")
+    rep.add_style("total", when="lt", value=0, color="red")
+    result = rep.run()
+
+    html_out = result.render_html(css=True)
+    assert "rpt-cond-0" in html_out
+    assert "<style>" in html_out
+    assert "color:red" in html_out
+    # la celda condicional usa clase, no style inline
+    assert '<td class="rpt-cond-0">' in html_out
+    assert '<td style="' not in html_out
+
+
+def test_html_css_mode_default_unchanged():
+    rows = [{"total": -5}]
+    rep = Report(rows)
+    rep.detail("total")
+    rep.add_style("total", when="lt", value=0, color="red")
+    result = rep.run()
+
+    html_out = result.render_html()
+    assert 'style="color:red"' in html_out
+    assert "<style>" not in html_out
+
+
+# --- HTML template de documento (TMPL-02) ---
+def test_html_template_document():
+    rows = [{"total": 10}]
+    rep = Report(rows, title="Mi Reporte")
+    rep.detail("total")
+    result = rep.run()
+
+    html_out = result.render_html(template=True)
+    assert html_out.startswith("<!DOCTYPE html>")
+    assert "<head>" in html_out
+    assert '<body class="report">' in html_out
+    assert "<title>Mi Reporte</title>" in html_out
+    # el fragmento por defecto no envuelve
+    assert not result.render_html().startswith("<!DOCTYPE html>")
+
+
+def test_html_template_with_css_style_in_head():
+    rows = [{"total": -5}]
+    rep = Report(rows, title="T")
+    rep.detail("total")
+    rep.add_style("total", when="lt", value=0, color="red")
+    result = rep.run()
+
+    html_out = result.render_html(template=True, css=True)
+    assert "<style>.rpt-cond-0{color:red}</style>" in html_out
+    assert "<head>" in html_out
+    assert html_out.index("<style>") < html_out.index("</head>")
+
+
+# --- Markdown (TMPL-03) ---
+def test_markdown_renderer():
+    rows = [{"sku": "A", "cantidad": 2}, {"sku": "B", "cantidad": 1}]
+    rep = Report(rows)
+    rep.group("global")
+    rep.section("global").header("Resumen")
+    rep.section("global").total("sum", "cantidad", label="total")
+    rep.detail("sku", "cantidad")
+    result = rep.run()
+
+    md = result.to_markdown()
+    assert "## Resumen" in md
+    assert "**total:** 3" in md
+    assert "| sku | cantidad |" in md
+    assert "|---|---|" in md
+
+
+def test_markdown_link_image():
+    rows = [{"id": 1, "sku": "A1"}]
+    rep = Report(rows)
+    rep.link("ver", "report", href="/pedido/{{id}}", label="Ver", after="id")
+    rep.image("foto", src="/media/{{sku}}.png", alt="Foto", after="sku")
+    rep.detail("id", "sku")
+    result = rep.run()
+
+    md = result.to_markdown()
+    assert "[Ver](/pedido/1)" in md
+    assert "![Foto](/media/A1.png)" in md
+
+
+def test_markdown_escapes_pipe():
+    rows = [{"nombre": "a|b", "monto": 1}]
+    rep = Report(rows)
+    rep.detail("nombre", "monto")
+    result = rep.run()
+
+    md = result.to_markdown()
+    assert "a\\|b" in md
+
+
 def test_excel_renderer():
     pytest.importorskip("openpyxl")
     rows = [{"sku": "A", "cantidad": 2}, {"sku": "B", "cantidad": 1}]

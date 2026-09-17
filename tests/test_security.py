@@ -122,6 +122,17 @@ def test_html_style_value_injection_mitigated():
     assert "position:fixed" not in html_out
 
 
+# --- P3c: inyección CSS en modo clases (css=True) ---
+def test_html_css_mode_injection_mitigated():
+    rows = [{"total": -5}]
+    rep = Report(rows)
+    rep.detail("total")
+    rep.add_style("total", when="lt", value=0, background="red;position:fixed")
+    result = rep.run()
+    html_out = result.render_html(css=True)
+    assert "position:fixed" not in html_out
+
+
 # --- P1b: sanitización de labels/headers en Excel ---
 def test_excel_total_label_sanitized():
     pytest.importorskip("openpyxl")
