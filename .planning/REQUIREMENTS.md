@@ -66,10 +66,10 @@ Milestone v1.1: Readers multi-formato + Templates HTML/Markdown.
 
 ### Templates / Markdown
 
-- [ ] **TMPL-01**: `render_html(css=True)` emite clases + bloque `<style>` en vez de `style="…"` inline (opt-in), preservando `_SAFE_PROP`/`_UNSAFE_VALUE`/`_esc`.
-- [ ] **TMPL-02**: `render_html(template=...)` envuelve la tabla en un documento HTML completo (`<head>`+`<style>`+`<body>`).
-- [ ] **TMPL-03**: existe `MarkdownRenderer` + `to_markdown()` (tablas GFM con escapado de `|`/newline, links/imágenes nativos, chart→texto).
-- [ ] **TMPL-04**: sin regresión de inyección CSS/HTML; plantillas solo vía sandbox `template.py` (`{{token}}`), nunca Jinja2 arbitrario.
+- [x] **TMPL-01**: `render_html(css=True)` emite clases + bloque `<style>` en vez de `style="…"` inline (opt-in), preservando `_SAFE_PROP`/`_UNSAFE_VALUE`/`_esc`.
+- [x] **TMPL-02**: `render_html(template=...)` envuelve la tabla en un documento HTML completo (`<head>`+`<style>`+`<body>`).
+- [x] **TMPL-03**: existe `MarkdownRenderer` + `to_markdown()` (tablas GFM con escapado de `|`/newline, links/imágenes nativos, chart→texto).
+- [x] **TMPL-04**: sin regresión de inyección CSS/HTML; plantillas solo vía sandbox `template.py` (`{{token}}`), nunca Jinja2 arbitrario.
 
 ### Streaming (diferido)
 
@@ -122,10 +122,10 @@ Deferred. No en el roadmap actual.
 | READ-03 | Phase 9 | Complete |
 | READ-04 | Phase 9 | Complete |
 | READ-05 | Phase 9 | Complete |
-| TMPL-01 | Phase 10 | Pending |
-| TMPL-02 | Phase 10 | Pending |
-| TMPL-03 | Phase 10 | Pending |
-| TMPL-04 | Phase 10 | Pending |
+| TMPL-01 | Phase 10 | Complete |
+| TMPL-02 | Phase 10 | Complete |
+| TMPL-03 | Phase 10 | Complete |
+| TMPL-04 | Phase 10 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total

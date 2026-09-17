@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: milestone
-status: in_progress
-stopped_at: Executing Phase 09 (09-01 complete)
-last_updated: 2026-09-17T05:32:48Z
+milestone_name: Readers multi-formato + Templates HTML/Markdown
+status: complete
+stopped_at: Completed 10-01-PLAN.md
+last_updated: 2026-09-17T05:42:00Z
 last_activity: 2026-09-17
 progress:
   total_phases: 10
-  completed_phases: 8
+  completed_phases: 10
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -25,18 +25,18 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 
 ## Current Position
 
-Phase: 09
-Plan: 01 complete (Readers multi-formato)
-Status: In progress
+Phase: 10
+Plan: 01 complete (Templates HTML + Markdown)
+Status: Complete
 Last activity: 2026-09-17
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -47,6 +47,7 @@ Progress: [█████████░] 89%
 | 01 | 3 | - | - |
 | 08 | 4 | - | - |
 | 09 | 1 | - | - |
+| 10 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -59,6 +60,7 @@ Progress: [█████████░] 89%
 | Phase 08 P03 | 4min | 2 tasks | 22 files |
 | Phase 08 P04 | 11min | 3 tasks | 7 files |
 | Phase 9 P1 | 5min | 3 tasks | 4 files |
+| Phase 10 P1 | 7min | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -79,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 08]: disable_error_code=[import-untyped] para openpyxl/reportlab en lugar de # type: ignore por línea: evita fricción con ruff isort (I001) y es el relax justificado que el plan permite
 - [Phase 08]: quality job sin needs (paralelo a test), replicando el patrón multi-job de publish.yml/docs.yml
 - [Phase 09]: `Reader` como `typing.Protocol` (no ABC); `coerce` aplica solo a texto delimitado (csv/tsv) — json/jsonl/tuples/excel preservan tipos ya tipados para no corromper IDs tipo `"001"`.
+- [Phase 10]: modo clases HTML opt-in (`css=False` por defecto, byte-idéntico al inline); el CSS del bloque `<style>` reutiliza `_SAFE_PROP`/`_UNSAFE_VALUE`/`_esc` (sin superficie de inyección nueva).
+- [Phase 10]: `MarkdownRenderer` consume `walk()`; `_md_cell` escapa valores planos y emite links/imágenes nativos, `_md_table` escapa solo headers (evita doble-escape de `|`); wrapper de documento estructural (nunca Jinja2).
 
 ### Pending Todos
 
@@ -86,7 +90,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- **[Pendiente · infra] Workflow `Docs` falla en `configure-pages@v5`** (GitHub Pages). Preexistente: runs 3–7 todos en `failure`, mientras el paso `Build docs` (mkdocs) sí pasa. Ajeno a la Fase 8 (el CI `test`+`quality` quedó verde). Requiere revisar la config de GitHub Pages (source/permisos) en `.github/workflows/docs.yml` o en los ajustes del repo. No bloquea el milestone.
+- **[Pendiente · infra] Workflow `Docs` falla en `configure-pages@v5`** (GitHub Pages). Preexistente: runs 3–7 todos en `failure`, mientras el paso `Build docs` (mkdocs) sí pasa. Ajeno a las Fases 8–10 (el CI `test`+`quality` quedó verde). Requiere revisar la config de GitHub Pages (source/permisos) en `.github/workflows/docs.yml` o en los ajustes del repo. No bloquea el milestone.
 
 ## Deferred Items
 
@@ -98,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T05:32:48Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-09-17T05:42:00Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None

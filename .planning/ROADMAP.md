@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 ### Milestone v1.1 — Readers multi-formato + Templates HTML/Markdown
 
 - [x] **Phase 9: Readers multi-formato** - Protocolo `Reader` + registro; readers stdlib (csv/tsv/json/jsonl/tuples) y `excel`; auto-detección de tipos (completed 2026-09-17)
-- [ ] **Phase 10: Templates HTML + Markdown** - HTML por clases (sin CSS inline), template de documento, `MarkdownRenderer` + `to_markdown()`
+- [x] **Phase 10: Templates HTML + Markdown** - HTML por clases (sin CSS inline), template de documento, `MarkdownRenderer` + `to_markdown()` (completed 2026-09-17)
 - *(diferido)* **Streaming de salida** - `to_csv(file=...)`/iteradores (entrada descartada, no-objetivo)
 
 ## Phase Details
@@ -192,7 +192,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 10-01-PLAN.md — Templates HTML + Markdown renderer
+- [x] 10-01-PLAN.md — Templates HTML + Markdown renderer
 
 ## Progress
 
@@ -210,4 +210,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 7. Refactor | - | Complete (directa) | 2026-09-16 |
 | 8. Tests & CI | 4/4 | Complete   | 2026-09-17 |
 | 9. Readers multi-formato | 1/1 | Complete | 2026-09-17 |
-| 10. Templates HTML + Markdown | 0/1 | Not started | - |
+| 10. Templates HTML + Markdown | 1/1 | Complete | 2026-09-17 |
