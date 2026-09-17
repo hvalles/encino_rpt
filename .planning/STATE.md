@@ -94,7 +94,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- **[Pendiente · infra] Workflow `Docs` falla en `configure-pages@v5`** (GitHub Pages). Preexistente: runs 3–7 todos en `failure`, mientras el paso `Build docs` (mkdocs) sí pasa. Ajeno a las Fases 8–10 (el CI `test`+`quality` quedó verde). Requiere revisar la config de GitHub Pages (source/permisos) en `.github/workflows/docs.yml` o en los ajustes del repo. No bloquea el milestone.
+- **[Pendiente · infra · requiere acción manual] Workflow `Docs` falla en `configure-pages@v5`**: causa raíz confirmada — `GET /repos/hvalles/encino_rpt/pages` devuelve **404** (GitHub Pages NO está habilitado en el repo). El `docs.yml` es correcto (permisos `pages: write`/`id-token: write`, `configure-pages`+`upload-pages-artifact`+`deploy-pages`); el build de `mkdocs` pasa. **Fix manual del owner**: Repo Settings → Pages → Source = "GitHub Actions" (y habilitar Pages). No requiere cambio de código.
 
 ## Deferred Items
 
