@@ -28,6 +28,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: Templates HTML + Markdown** - HTML por clases (sin CSS inline), template de documento, `MarkdownRenderer` + `to_markdown()` (completed 2026-09-17)
 - [x] **Streaming de salida** - `iter_csv`/`iter_text`/`iter_html`/`iter_markdown` + `file=` (entrada descartada, no-objetivo) *(completado 2026-09-17, directo)*
 
+### Milestone v1.2 — Engine bug fixes (correctness)
+
+- [ ] **Phase 11: Engine bug fixes** - `detail(source=)`, totales `None`, contexto chart/pivot, `suppress_zero`/no-hashable con error claro, `count` semántica, serialización profunda
+
 ## Phase Details
 
 ### Phase 1: Quick Wins (Corrección low-risk)
