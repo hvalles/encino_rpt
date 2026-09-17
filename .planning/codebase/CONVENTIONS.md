@@ -4,169 +4,169 @@
 
 ## Naming Patterns
 
-**Files (modules):**
+**Modules (files):**
 - `snake_case.py` for all modules: `report.py`, `section.py`, `aggregation.py`, `pivot.py`, `expressions.py`, `template.py`, `charts.py`, `models.py`
-- Leading-underscore for internal modules: `_specs.py` (builder dataclasses), `renderers/_format.py`, `renderers/_sanitize.py`, `renderers/_walk.py` (shared traversal)
-- Tests: `tests/test_<area>.py` — `test_report.py`, `test_report_renderers.py`, `test_security.py`
+- Leading underscore for internal modules: `encino_rpt/_specs.py` (builder dataclasses), `encino_rpt/renderers/_format.py`, `encino_rpt/renderers/_sanitize.py`, `encino_rpt/renderers/_walk.py`
+- Tests: `tests/test_<area>.py` — `test_report.py`, `test_report_renderers.py`, `test_security.py`, `test_perf_smoke.py`
 
 **Classes:**
 - `PascalCase`: `Report`, `Section`, `ReportResult`, `Group`, `Detail`, `Chart`, `Pivot`, `Kpi`, `Total`, `Format`, `Link`, `Image`, `ConditionalRule`, `Series`, `ReportMeta`, `FieldSpec`, `ExpressionError`, `AggregationError`
 - Renderers suffixed `Renderer`: `CsvRenderer`, `ExcelRenderer`, `HtmlRenderer`, `JsonRenderer`, `PdfRenderer`, `TextRenderer` (in `encino_rpt/renderers/`)
 - Internal spec dataclasses suffixed `Spec`: `FieldSpec`, `TotalSpec`, `ChartSpec`, `PivotSpec`, `KpiSpec`, `GroupSpec` (in `encino_rpt/_specs.py`)
+- Internal helper class `_PathNode` (trie node) prefixed `_` (`encino_rpt/aggregation.py:246`)
 
 **Functions:**
-- `snake_case`: `add_function`, `build_chart`, `format_value`, `sanitize_csv`, `evaluate`, `build_pivot`, `render`
-- Private module-level helpers prefixed `_`: `_build_group_tree`, `_apply_order`, `_compute_totals_into`, `_enrich`, `_esc`, `_wrap`, `_partition`, `_sort_key`, `_is_zero`, `_ordered_unique`, `_make_path_node`
+- `snake_case`: `add_function`, `build_chart`, `format_value`, `sanitize_csv`, `evaluate`, `build_pivot`, `render`, `build`, `walk`
+- Private module-level helpers prefixed `_`: `_build_group_tree`, `_apply_order`, `_compute_totals_into`, `_enrich`, `_esc`, `_wrap`, `_partition`, `_sort_key`, `_is_zero`, `_ordered_unique`, `_make_path_node`, `_walk`, `_full_row`, `_total_row`, `_cell_attrs`, `_style_attr`, `_add_thousands`
 - Prefer full words over abbreviations (`_build_path_group`, not `_bld`); `_esc` and `_segs` are the only cross-module abbreviations
 
 **Variables:**
-- `snake_case`: `rows`, `visible_set`, `child_pairs`, `deferred`, `registry`, `children_map`
-- Private instance attributes prefixed `_`, set in `__init__`: `self._rows`, `self._functions`, `self._groups` (`encino_rpt/report.py:27-39`), `self._spec` (`encino_rpt/section.py:11-12`)
+- `snake_case`: `rows`, `visible_set`, `child_pairs`, `deferred`, `registry`, `children_map`, `root_spec`, `spec`
+- Private instance attributes prefixed `_`, set in `__init__`: `self._rows`, `self._functions`, `self._groups`, `self._fields`, `self._detail`, `self._order`, `self._formats`, `self._styles`, `self._datasets`, `self._kpis`, `self._aggregates` (`encino_rpt/report.py:29-41`), `self._spec` (`encino_rpt/section.py:11-12`)
 - Pydantic `PrivateAttr` for non-serialized context: `_first_row`, `_header_tpl`, `_footer_tpl` (`encino_rpt/models.py:124-126`)
-- Instance-private attributes set transiently by `ExcelRenderer.render` (not in `__init__`): `self._ws`, `self._result`, `self._formulas`, `self._row` (`encino_rpt/renderers/excel.py:51-54`)
+- Instance-private attributes set transiently by `ExcelRenderer.render` (not in `__init__`): `self._ws`, `self._result`, `self._formulas`, `self._row` (`encino_rpt/renderers/excel.py:55-58`)
 
 **Constants:**
-- `UPPER_SNAKE`, module-level, usually private: `_MAX_NODES`, `_MAX_DEPTH`, `_MAX_POW_EXP` (`encino_rpt/expressions.py:45-47`), `_TOKEN` regex (`encino_rpt/template.py:7`), `_DANGEROUS_PREFIXES`, `_LEADING_TRIM` (`encino_rpt/renderers/_sanitize.py:7-9`), `_SAFE_PROP`, `_UNSAFE_VALUE` (`encino_rpt/renderers/html.py:21-22`), `SCHEMA_VERSION = "1.0"` (`encino_rpt/renderers/json.py:7`)
-- Private module-level dispatch dicts map operator/type keys to lambdas: `_BINOPS`, `_UNARY`, `_CMP`, `_FUNCTIONS` (`encino_rpt/expressions.py:9-42`), `_OPS` (`encino_rpt/renderers/html.py:12-19`), `_COLOR_OPS` (`encino_rpt/renderers/excel.py:10-17`)
+- `UPPER_SNAKE`, module-level: `_MAX_NODES`, `_MAX_DEPTH`, `_MAX_POW_EXP` (`encino_rpt/expressions.py:46-48`), `_TOKEN` regex (`encino_rpt/template.py:7`), `_DANGEROUS_PREFIXES`, `_LEADING_TRIM` (`encino_rpt/renderers/_sanitize.py:7-9`), `_SAFE_PROP`, `_UNSAFE_VALUE` (`encino_rpt/renderers/html.py:21-22`), `SCHEMA_VERSION = "1.0"` (`encino_rpt/renderers/json.py:7`)
 
-**Types:**
-- Prefer `str | None` over `Optional[str]`; PEP 604 unions and builtin generics (`list[dict]`, `dict[str, Any]`) everywhere, enabled by `from __future__ import annotations`
+**Type hints:**
+- `from __future__ import annotations` at the top of every module (enables PEP 604 unions and builtin generics)
+- Prefer `str | None` over `Optional[str]`; builtin generics (`list[dict]`, `dict[str, Any]`) everywhere
 - `Any` used for untyped row data: `dict[str, Any]`, `value: Any`, `format: Any`
 
 ## Code Style
 
 **Formatting:**
-- No formatter configured — no `black`, no `ruff format`. There is **no ruff config** (`pyproject.toml` has no `[tool.ruff]`, no `ruff.toml`/`.ruff.toml`).
-- Linting only: **ruff** `0.16.7` (dev dependency, `pyproject.toml:53`), run with defaults via `uv run ruff check` (`.github/workflows/ci.yml:29-30`).
-- Only rule set: ruff defaults. No `select`/`ignore` pinned. The suite is currently clean (`ruff check` exits 0).
-- Indentation: 4 spaces throughout. Line length is not enforced.
-- One known outlier: `encino_rpt/__init__.py:3-17` aligns `from .models import (...)` items to column 21, inconsistent with `encino_rpt/renderers/__init__.py` which uses one-item-per-line at 4-space indent.
+- **ruff** `0.16.7` — formatter is now configured via `[tool.ruff.format]` in `pyproject.toml:78-79` with `quote-style = "double"`
+- `[tool.ruff]` config (`pyproject.toml:73-76`): `target-version = "py310"`, `line-length = 88`, `extend-exclude = [".planning", "docs", "dist", "build", ".venv"]`
+- Line length is 88 (enforced by ruff format check in CI, `.github/workflows/ci.yml:50`)
+- Indentation: 4 spaces throughout
+- Double quotes for strings (ruff format `quote-style = "double"`)
+
+**Linting:**
+- **ruff** `0.16.7` (dev dependency, `pyproject.toml:53`), run with defaults: `uv run ruff check` (`.github/workflows/ci.yml:30`). No `select`/`ignore` pinned — ruff defaults only.
+
+**Type checking:**
+- **mypy** `2.3.1` (dev dependency, `pyproject.toml:54`), configured in `[tool.mypy]` (`pyproject.toml:63-71`):
+  - `plugins = ["pydantic.mypy"]`
+  - `python_version = "3.10"`
+  - `check_untyped_defs = true`
+  - `warn_unused_ignores = true`
+  - `warn_redundant_casts = true`
+  - `no_implicit_optional = true`
+  - `disable_error_code = ["import-untyped"]` (openpyxl/reportlab have no typed stubs)
+- Run in CI as `uv run mypy encino_rpt` (`.github/workflows/ci.yml:47`)
 
 ## Import Organization
 
-**Order** (every module follows this):
-1. `from __future__ import annotations` (first line after the module docstring)
-2. blank line
-3. stdlib imports
-4. blank line
-5. third-party imports (only `pydantic` in `models.py`; `openpyxl`/`reportlab` imported lazily inside methods)
-6. blank line
-7. relative imports (`from .`, `from ..`)
+**Order (top to bottom):**
+1. `from __future__ import annotations` (always first)
+2. stdlib imports (`ast`, `operator`, `csv`, `io`, `re`, `typing`, `collections.abc`, `datetime`, `decimal`, `html`, `time`)
+3. blank line, then relative imports grouped alphabetically
 
-Examples:
+**Examples:**
 - `encino_rpt/models.py:3-7`: future import → `typing` (stdlib) → `pydantic`
-- `encino_rpt/aggregation.py:3-20`: future import → blank → relative imports grouped alphabetically
-
-**No path aliases.** All intra-package imports are always relative:
-- `from ._specs import ...` (`encino_rpt/report.py:7`)
-- `from ..models import ...` (`encino_rpt/renderers/csv.py:8`)
+- `encino_rpt/aggregation.py:3-24`: future import → `typing` → blank → relative imports grouped alphabetically (`_specs`, `charts`, `expressions`, `models`, `pivot`, `template`)
+- `from ._specs import FieldSpec, GroupSpec, KpiSpec` (`encino_rpt/report.py:7`)
+- `from ..models import Image, Link` (`encino_rpt/renderers/csv.py:8`)
 - `from ._walk import walk` (`encino_rpt/renderers/csv.py:11`)
 
-**Lazy imports for cycles and optional deps** (import inside the method, never at module top):
-- `from .aggregation import build` inside `Report.run()` (`encino_rpt/report.py:286`)
-- `from .renderers.html import HtmlRenderer` inside `ReportResult.render_html` (`encino_rpt/models.py:160`)
-- `from openpyxl import Workbook` inside `ExcelRenderer.render` (`encino_rpt/renderers/excel.py:42-44`)
-- `from reportlab.platypus import ...` inside `PdfRenderer.render` (`encino_rpt/renderers/pdf.py:30-39`)
-- Per-helper imports: `from openpyxl.styles import Font` inside `_full_row`/`_total_row`/`_apply_conditional` (`encino_rpt/renderers/excel.py:161,170,188`)
+**Path aliases:** none — only relative imports are used.
+
+**Lazy imports (inside methods, not module top):**
+- `from .aggregation import build` inside `Report.run()` (`encino_rpt/report.py:367`)
+- `from .renderers.html import HtmlRenderer` inside `ReportResult.render_html` (`encino_rpt/models.py:162`); same pattern for csv/text/excel/json/pdf (`models.py:175,185,200,213,227`)
+- `from openpyxl import Workbook` + `from openpyxl.styles import Font` inside `ExcelRenderer.render` (`encino_rpt/renderers/excel.py:44-46`)
+- `from reportlab.platypus import ...` inside `PdfRenderer.render` (`encino_rpt/renderers/pdf.py:31-40`)
+- Per-helper imports for optional deps: `from openpyxl.styles import Font` inside `_full_row`/`_total_row`/`_apply_conditional`/`_chart`/`_pivot` (`encino_rpt/renderers/excel.py:170,179,197,217,252`); `from reportlab.platypus import Paragraph` inside `pdf.py:125,137,143`
 
 ## Error Handling
 
-**Domain exceptions subclass builtins** (not `Exception` directly):
-- `class ExpressionError(ValueError)` (`encino_rpt/expressions.py:50`)
-- `class AggregationError(ValueError)` (`encino_rpt/aggregation.py:23`)
+**Exception hierarchy (all subclasses of `ValueError`):**
+- `class ExpressionError(ValueError)` (`encino_rpt/expressions.py:51`)
+- `class AggregationError(ValueError)` (`encino_rpt/aggregation.py:30`)
 
-**Messages in Spanish, always include the offending value via `!r`:**
-- `ValueError` for invalid config: `raise ValueError(f"corte ya declarado: {name!r}")` (`encino_rpt/report.py:250`)
-- `KeyError` for unknown named lookups: `f"corte no declarado: {name!r}"` (`encino_rpt/report.py:277`)
-- `IndexError` for out-of-range param access: `f"parámetro {index} fuera de rango (hay {len(params)})"` (`encino_rpt/template.py:26`)
-- `AggregationError` wraps engine failures with context: `f"total {ts.name or ts.operator!r} (grupo {spec.name!r})"` (`encino_rpt/aggregation.py:195`)
+**Error message language: Spanish, always.**
 
-**Context wrapping pattern** (`encino_rpt/aggregation.py:27-36`): `_wrap(context, fn, *args)` re-raises any error as `AggregationError` with a readable context string, preserving `AggregationError` as-is and chaining via `from exc`. Use this for any engine-level failure.
+**Validation errors:**
+- `ValueError` for invalid config: `raise ValueError("`columns` y `path` son excluyentes")` (`encino_rpt/report.py:324`), `raise ValueError(f"corte ya declarado: {name!r}")` (`report.py:326`)
+- `KeyError` for unknown named lookups: `f"corte no declarado: {name!r}"` (`encino_rpt/report.py:358`)
+- `IndexError` for out-of-range param access: `f"parámetro {index} fuera de rango (hay {len(params)})"` (`encino_rpt/template.py:26-28`)
+- `ValueError` for invalid direction: `f"dirección de orden inválida: {direction!r}"` (`encino_rpt/section.py:172-173`)
 
-**Optional-dependency guards** re-raise `ImportError` with `from exc` and a Spanish install hint:
-- `raise ImportError("openpyxl no está instalado; instala el extra `excel`") from exc` (`encino_rpt/renderers/excel.py:46`)
-- `raise ImportError("reportlab no está instalado; instala el extra `pdf`") from exc` (`encino_rpt/renderers/pdf.py:41`)
-- Both guarded with `# pragma: no cover - depende del entorno` (`excel.py:45`, `pdf.py:40`)
+**Context wrapping pattern (`_wrap`):**
+- `_wrap(context, fn, *args)` re-raises any error as `AggregationError` with a `{context}: ...` prefix (`encino_rpt/aggregation.py:34-43`). Used for field enrichment (`campo {name!r} (fila {index})`), totals (`total {name or operator!r} (grupo {spec.name!r})`), deferred totals, and KPIs.
 
-**Builder validates eagerly** (raise early, not at `run()`): `group()` raises `ValueError` when `columns` and `path` are both set (`encino_rpt/report.py:247-248`); `Section.order_by` raises for invalid direction (`encino_rpt/section.py:130-131`). Cross-reference validation (`source`/`parent`/`custom:` declared) happens in `_validate` at `run()` (`encino_rpt/aggregation.py:441-458`).
+**Optional dependency errors (guarded imports):**
+- `raise ImportError("openpyxl no está instalado; instala el extra `excel`") from exc` (`encino_rpt/renderers/excel.py:47-50`)
+- `raise ImportError("reportlab no está instalado; instala el extra `pdf`") from exc` (`encino_rpt/renderers/pdf.py:41-44`)
+- Both branches marked `# pragma: no cover - depende del entorno` (excluded from coverage via `exclude_lines` in `pyproject.toml:88`)
 
-**Aggregation never catches its own exceptions** — a failing expression propagates up through `run()` to the caller (wrapped as `AggregationError`).
+**Aggregation never catches exceptions:** a failing expression propagates up through `run()` to the caller. `AggregationError` passes through `_wrap` unchanged (re-raised, not double-wrapped).
 
 ## Logging
 
-- No logging framework used — the library is pure and stateless, so no `logging` module anywhere. Errors are raised, not logged.
+No logging framework used — the library is pure and stateless, so no `logging` module anywhere. Errors are raised, not logged.
 
 ## Comments
 
-- Module docstring in every module (one line, Spanish): `"""Agregación: enriquece renglones, construye el árbol de grupos y resuelve totales."""` (`encino_rpt/aggregation.py:1`)
-- Google-style docstrings (Spanish) on every public class and method with `Args:`, `Returns:`, `Raises:` sections — see `Report.group` (`encino_rpt/report.py:224-246`) and `ReportResult.to_excel` (`encino_rpt/models.py:187-200`)
-- Section banner comments inside longer modules: `# --- funciones / campos ---` (`encino_rpt/report.py:41`), `# --- árbol de grupos ---` (`encino_rpt/aggregation.py:138`), `# --- fase B ---` (`encino_rpt/aggregation.py:381`), `# --- plantillas (fase final) ---` (`encino_rpt/aggregation.py:392`)
-- Inline comments explain non-obvious invariants, in Spanish: `# None -> raíz (una sola partición)` (`encino_rpt/_specs.py:80`), `# children: subgrupos o detalle` (`encino_rpt/aggregation.py:288`), `# Contexto interno (no serializado)...` (`encino_rpt/models.py:123`)
-- Comments in source are **Spanish**; avoid English comments in new code.
+**Docstrings:**
+- One-line module docstring in every module (Spanish): `"""Builder fluido `Report`."""` (`encino_rpt/report.py:1`), `"""Evaluador seguro de expresiones (sin `eval`, whitelist vía `ast`)."""` (`encino_rpt/expressions.py:1`)
+- Google-style docstrings (Spanish) on every public class and method, with `Args:`, `Returns:`, `Raises:` sections — see `Report.group` (`encino_rpt/report.py:295-322`), `ReportResult.to_excel` (`encino_rpt/models.py:189-202`), `Report.set_format` (`report.py:70-98`)
+- Renderer `render()` docstrings include a `Raises:` section documenting the `ImportError` for optional deps (`excel.py:41-42`, `pdf.py:28-29`)
+
+**Section banner comments** inside longer modules:
+- `# --- funciones / campos ---` (`encino_rpt/report.py:43`)
+- `# --- detalle / grupos ---` (`report.py:281`)
+- `# --- árbol de grupos ---` (`encino_rpt/aggregation.py:155`)
+- `# --- fase B ---` (`aggregation.py:447`)
+- `# --- plantillas (fase final) ---` (`aggregation.py:464`)
+- `# --- P1: inyección de fórmulas ---` and similar in `tests/test_security.py`
+
+**Inline comments** explain non-obvious invariants, in Spanish:
+- `# None -> raíz (una sola partición)` (`encino_rpt/_specs.py:80`)
+- `# children: subgrupos o detalle` (`encino_rpt/aggregation.py:324`)
+- `# Contexto interno (no serializado)...` (`encino_rpt/models.py:123`)
+- `# fase C sobre los hijos (grupos/detalle), antes de añadir chart/pivot` (`aggregation.py:349`)
+- `# dividir cada fila una sola vez (PERF-02)` (`aggregation.py:260`)
+
+**Comments in source are Spanish.** Avoid English comments in new code.
 
 ## Function Design
 
-**Fluent builder methods** return `self` typed as the class: `-> Report` (`encino_rpt/report.py:42,55,68,...`), `-> Section` (`encino_rpt/section.py:14,26,40,...`). They validate immediately and return `self` for chaining.
+**Signature conventions:**
+- Keyword-only parameters after `*` for optional config: `def set_format(self, column: str, *, kind: str = "number", ...)` (`encino_rpt/report.py:70-82`), `def add_field(self, name: str, expression: str | None = None, *, after: str | None = None, ...)` (`report.py:173-183`)
+- Optional config params often untyped (`format=None`, `fn`) where the type is `Format`/callable — see `add_function(self, name: str, fn) -> Report` (`report.py:44`)
+- Fluent builder methods always return `self` (or `Section`) for chaining, with `Returns:` docstring noting "El propio reporte (fluido)."
 
-**Keyword-only args after the first positional(s), marked `*`:**
-- `def set_format(self, column: str, *, kind: str = "number", ...)` (`encino_rpt/report.py:68-72`)
-- `def add_field(self, name: str, expression: str | None = None, *, after: str | None = None, ...)` (`encino_rpt/report.py:145-148`)
+**Size:** functions are short and single-purpose; long module bodies are split into private `_`-prefixed helpers (`aggregation.py` is the longest at 566 lines but decomposed into ~20 helpers).
 
-**Optional params default to `None`** and are stored/checked explicitly: `columns: str | None = None`, `title: str | None = None`, `source: str | None = None`.
-
-**`format=None`** is the one place a shadowed builtin name is used as a parameter (avoids importing `Format` in the public builder API) — `encino_rpt/report.py:127`, `encino_rpt/section.py:43`.
-
-**Render methods return plain data:** `str` (`render_html`, `to_csv`, `to_text`, `to_json`), `Worksheet` (`to_excel`), `bytes` (`to_pdf`) — `encino_rpt/models.py:150-227`.
-
-**Use `row.get(col)` with `None` fallbacks, never `row[col]`** — see `_value_for` (`encino_rpt/aggregation.py:80`), `_partition` (`encino_rpt/aggregation.py:167`), all renderers.
+**Return values:** renderers return strings (`csv.py`, `html.py`, `text.py`, `json.py`), bytes (`pdf.py`), or a worksheet (`excel.py`); `format_value` returns `str`; `evaluate` returns `Any`.
 
 ## Module Design
 
-**Public API surface** is defined in `encino_rpt/__init__.py` with an explicit `__all__` (14 names). `Section` is intentionally **not** exported — it is reachable only via `Report.group()` / `Report.section()` return values.
+**Exports:**
+- `encino_rpt/__init__.py` re-exports 14 public names via `__all__` (`__init__.py:20-34`). `Section` is intentionally NOT exported (reachable only via `Report.group()`/`Report.section()`).
+- `encino_rpt/renderers/__init__.py` exports the 6 renderer classes via `__all__` (`renderers/__init__.py:10-17`).
 
-**`encino_rpt/renderers/__init__.py`** re-exports all six renderers with `__all__ = ["CsvRenderer", "ExcelRenderer", "HtmlRenderer", "JsonRenderer", "PdfRenderer", "TextRenderer"]`.
+**Barrel files:** `encino_rpt/__init__.py` and `encino_rpt/renderers/__init__.py` are the only barrels; internal helpers (`_specs.py`, `expressions.py`, `template.py`, `charts.py`, `pivot.py`, `aggregation.py`) are imported directly by path, not re-exported.
 
-**Internal modules are not exported:** `_specs.py`, `aggregation.py`, `expressions.py`, `template.py`, `pivot.py`, `charts.py`, `renderers/_format.py`, `renderers/_sanitize.py`, `renderers/_walk.py`.
-
-**Layered design:**
-- Public fluent facade: `encino_rpt/report.py` (`Report`) + `encino_rpt/section.py` (`Section`) — mutate internal spec dataclasses
-- Internal specs: `encino_rpt/_specs.py` (dataclasses, `field(default_factory=list)` for mutable defaults)
-- Canonical output model: `encino_rpt/models.py` (pydantic `BaseModel`, `Field(default_factory=...)` for mutable defaults, `PrivateAttr` for non-serialized context)
-- Pipeline: `encino_rpt/aggregation.py` → `charts.py` / `pivot.py` / `expressions.py` / `template.py`
-- Renderers: `encino_rpt/renderers/` — consume the shared `walk` generator and dispatch per event
-
-**Shared tree traversal:** `encino_rpt/renderers/_walk.py` exports a single iterative generator `walk(root)` that yields typed events `("group_start"|"group_end"|"detail"|"chart"|"pivot", node)`. Every renderer imports `walk` and implements a thin `_walk`/`_collect` method that dispatches on `event`. Do NOT reimplement tree recursion per renderer — always `from ._walk import walk`.
-
-**Known coupling:** `aggregation.py` reaches into `Report` private attributes directly — `report._rows`, `report._datasets`, `report._fields`, `report._functions`, `report._groups`, `report._order`, `report._aggregates`, `report._kpis`, `report._title`, `report._params` (`encino_rpt/aggregation.py:110,115,128,140-152,197,424`). Prefer adding accessor methods on `Report` if this coupling grows.
+**Module responsibilities:**
+- `encino_rpt/models.py` — pydantic `BaseModel` canonical tree (13 models), `Field(default_factory=...)` for mutable defaults, `PrivateAttr` for non-serialized context, recursive `Group.children` resolved with `Group.model_rebuild()` at module bottom (`models.py:232`)
+- `encino_rpt/_specs.py` — internal `@dataclass` specs, `field(default_factory=list)` for mutable defaults
+- `encino_rpt/aggregation.py` — the engine (enrich, group tree, totals, deferred resolution, templates, KPIs)
+- `encino_rpt/renderers/` — visitor-style renderers consuming the shared `walk()` generator
 
 ## Patterns to Follow
 
 - **Fluent builder**: validate immediately (raise early) and return `self`
-- **"Truthiness coalescing" for label fallbacks**: `label = t.label or t.name or t.operator` (`encino_rpt/renderers/csv.py:50`, also `text.py:46`, `html.py:69`, `pdf.py:86`, `excel.py:103`)
+- **"Truthiness coalescing" for label fallbacks**: `label = t.label or t.name or t.operator` (`encino_rpt/renderers/csv.py:55`, also `text.py:46`, `html.py:71`, `pdf.py:96`, `excel.py:107`)
 - **Dict `or` fallback for user config**: `self.classes = classes or {}`, `self.styles = styles or {}`, `spec.options or {}`
-- **Module-level `_OPS`-style dispatch dicts** instead of if/else chains for operator lookup
-- **Preserve insertion order explicitly** where dicts don't: `_ordered_unique` (`encino_rpt/pivot.py:47-54`), `order` list parallel to `index` dict in `_partition` (`encino_rpt/aggregation.py:164-174`)
-- **Pydantic recursive model** resolved with `Group.model_rebuild()` at module bottom (`encino_rpt/models.py:230`)
-- **JSON versioning**: `JsonRenderer` injects `schema_version` via `{"schema_version": SCHEMA_VERSION, **result.model_dump(mode="json")}` (`encino_rpt/renderers/json.py:27`)
+- **Module-level `_OPS`-style dispatch dicts** instead of if/else chains for operator lookup: `_BINOPS`, `_UNARY`, `_CMP`, `_FUNCTIONS` (`encino_rpt/expressions.py:10-42`), `_OPS` (`renderers/html.py:12-19`), `_COLOR_OPS` (`renderers/excel.py:10-17`)
+- **Preserve insertion order explicitly** where dicts don't: `_ordered_unique` (`encino_rpt/pivot.py:49-56`), `order` list parallel to `index` dict in `_partition` (`encino_rpt/aggregation.py:178-189`)
+- **Pydantic recursive model** resolved with `Group.model_rebuild()` (`encino_rpt/models.py:232`)
+- **JSON versioning**: `JsonRenderer.to_dict` injects `schema_version` via `{"schema_version": SCHEMA_VERSION, **result.model_dump(mode="json")}` (`encino_rpt/renderers/json.py:27`)
 
-## Anti-Patterns
+---
 
-### Reimplementing tree traversal per renderer
-**What happens:** Each renderer once carried its own recursive `_walk` visitor with duplicated dispatch logic.
-**Why it's wrong:** Divergent traversal order and duplicated recursion (which blows the stack on deep `path` hierarchies).
-**Do this instead:** Import the shared iterative generator `from ._walk import walk` and dispatch on its typed events (see `encino_rpt/renderers/csv.py:43-66`).
-
-### `.__init__.py` import-list alignment
-**What happens:** `encino_rpt/__init__.py` pads `from .models import (...)` items to align at column 21.
-**Why it's wrong:** Inconsistent with every other module (4-space indent, one item per line).
-**Do this instead:** One-item-per-line at 4-space indent, matching `encino_rpt/renderers/__init__.py`.
-
-### Cross-module private attribute access
-**What happens:** `aggregation.py` reads `report._rows`, `report._groups`, `report._order`, etc. directly.
-**Why it's wrong:** Tightly couples the engine to the builder's private state; a rename silently breaks aggregation.
-**Do this instead:** Add accessor methods on `Report` and have `aggregation.py` call those if the coupling grows.
-
-### Duplicated operator/conditional tables per renderer
-**What happens:** `_OPS` (HTML) and `_COLOR_OPS` (Excel) define the same six comparison lambdas independently.
-**Why it's wrong:** Drift risk if a new operator (`eq`, `ne`, etc.) is added in only one place.
-**Do this instead:** Extract a shared `_compare(when, a, b)` helper if another renderer needs the same table.
+*Convention analysis: 2026-09-17*
