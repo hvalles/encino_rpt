@@ -462,7 +462,7 @@ node.children = _apply_order(spec, node.children, report._functions)
 ## Sources
 
 ### Primary (HIGH confidence)
-- **Código fuente verificad o por lectura directa:** `encino_rpt/aggregation.py` (277-307, 102, 174, 260), `encino_rpt/renderers/_format.py` (23-29, 42-48), `encino_rpt/renderers/_sanitize.py` (5-27), `encino_rpt/renderers/csv.py`, `encino_rpt/renderers/excel.py`, `encino_rpt/section.py` (117-138), `encino_rpt/models.py` (Format), `pyproject.toml`, `uv.lock`, `.github/workflows/*.yml` — topics: call sites, firmas, estado actual.
+- **Código fuente verificado por lectura directa:** `encino_rpt/aggregation.py` (277-307, 102, 174, 260), `encino_rpt/renderers/_format.py` (23-29, 42-48), `encino_rpt/renderers/_sanitize.py` (5-27), `encino_rpt/renderers/csv.py`, `encino_rpt/renderers/excel.py`, `encino_rpt/section.py` (117-138), `encino_rpt/models.py` (Format), `pyproject.toml`, `uv.lock`, `.github/workflows/*.yml` — topics: call sites, firmas, estado actual.
 - **Probes de ejecución (2026-09-16, Python 3.11.13/3.14.7):** reproducción de los 5 bugs; umbrales de sci de `str()`; comportamiento de `lstrip()` con BOM; POC completo de `format_value` con escala Decimal; POC end-to-end del sanitizer ampliado por monkeypatch (CSV + Excel); `_add_thousands` con precisión completa; suite actual 32 tests verdes.
 - **Contexto del proyecto:** `.planning/phases/01-quick-wins-correcci-n-low-risk/01-CONTEXT.md` (decisiones D-01..D-10), `01-DISCUSSION-LOG.md`, `.planning/codebase/CONCERNS.md` (Known Bugs/Security), `.planning/codebase/TESTING.md` (convenciones de test), `.planning/ROADMAP.md` (success criteria).
 
