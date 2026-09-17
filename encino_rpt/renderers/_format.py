@@ -20,13 +20,18 @@ def format_value(value, fmt) -> str:
         value = int(value)
     if isinstance(value, (int, float, Decimal)):
         num = value
-        if fmt.percent_scale:
-            num = num * 100
         neg = num < 0
         if fmt.decimals is not None:
+            if fmt.percent_scale:
+                num = num * 100
             text = f"{abs(num):.{fmt.decimals}f}"
+        elif fmt.percent_scale:
+            # escala exacta sin artefactos binarios: 0.07*100 -> "7", nunca "7.000000000000001"
+            d = (Decimal(str(abs(value))) * 100).normalize()
+            text = format(d, "f")
         else:
-            text = f"{abs(num):g}"
+            # repr round-trip corto; sci solo en |num|>=1e16 o <1e-4 (D-02)
+            text = str(abs(value))
         if fmt.thousands:
             text = _add_thousands(text)
         if fmt.kind == "percent":
