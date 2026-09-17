@@ -116,13 +116,8 @@ class PdfRenderer:
                     ]
                 )
             elif event == "chart":
-                summary = "; ".join(
-                    f"{s.label or ''}: {', '.join(map(str, s.values))}"
-                    for s in node.series
-                )
-                self._full(
-                    f"{node.kind} {node.title or ''} — {summary}", rows, spans, ncols
-                )
+                rows.append([self._chart_drawing(node)])
+                spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
             elif event == "pivot":
                 rows.append([self._pivot_table(node)])
                 spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
@@ -145,6 +140,47 @@ class PdfRenderer:
         rows.append([Paragraph(f"<b>{_esc(text)}</b>", self._normal)])
         spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
 
+    def _chart_drawing(self, node, width=460, height=200):
+        """Construye un gráfico nativo de reportlab (`reportlab.graphics`)."""
+        from reportlab.graphics.charts.barcharts import VerticalBarChart
+        from reportlab.graphics.charts.linecharts import HorizontalLineChart
+        from reportlab.graphics.charts.piecharts import Pie
+        from reportlab.graphics.shapes import Drawing, String
+
+        drawing = Drawing(width, height)
+        values = [[_num(v) for v in s.values] for s in node.series]
+        labels = [str(x) for x in node.labels]
+        if node.title:
+            drawing.add(String(8, height - 14, node.title))
+        if node.kind == "pie" and values:
+            pie = Pie()
+            pie.x = 130
+            pie.y = 6
+            pie.width = height - 16
+            pie.height = height - 16
+            pie.data = values[0]
+            pie.labels = labels
+            drawing.add(pie)
+        elif node.kind == "line" and values:
+            lc = HorizontalLineChart()
+            lc.x = 40
+            lc.y = 30
+            lc.width = width - 80
+            lc.height = height - 60
+            lc.data = values
+            lc.categoryAxis.categoryNames = labels
+            drawing.add(lc)
+        elif values:
+            bc = VerticalBarChart()
+            bc.x = 40
+            bc.y = 30
+            bc.width = width - 80
+            bc.height = height - 60
+            bc.data = values
+            bc.categoryAxis.categoryNames = labels
+            drawing.add(bc)
+        return drawing
+
     def _pivot_table(self, node):
         from reportlab.platypus import Paragraph, Table
 
@@ -164,3 +200,7 @@ class PdfRenderer:
 
 def _esc(text) -> str:
     return _html.escape(str(text))
+
+
+def _num(value) -> float:
+    return float(value) if isinstance(value, (int, float)) else 0.0

@@ -778,7 +778,7 @@ Mapeo de nodos y celdas por destino:
 | `group` header/footer | `<tr class="group">` | fila con negrita | línea | párrafo/encabezado |
 | `total` | `<tr class="total">` | fila con formato numérico | línea | fila de total |
 | `detail` | `<tr>` | fila | fila | fila |
-| `chart` | `<canvas>`/SVG (Chart.js) | gráfico nativo | tabla resumen (labels/values) | imagen (matplotlib/weasyprint) |
+| `chart` | SVG inline (Python puro) | gráfico nativo | tabla resumen (labels/values) | gráfico nativo (`reportlab.graphics`) |
 | `pivot` | `<table>` de dos dimensiones | hoja con matriz | matriz aplanada (fila, col, valor) | tabla de dos dimensiones |
 | `kpi` | tarjeta/`<div>` | celda(s) de resumen | línea `label=value` | tarjeta de resumen |
 | `Link` | `<a href target>` | hipervínculo (`cell.hyperlink`) | solo `label`/`href` | anotación de enlace |

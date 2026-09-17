@@ -738,3 +738,30 @@ def test_excel_conditional_color_css_hex():
     ws = rep.run().to_excel()
     vals = [c.value for row in ws.iter_rows() for c in row]
     assert "monto" in vals
+
+
+def test_chart_html_svg():
+    # HTML renderiza los gráficos como SVG inline (sin JS/CDN).
+    rows = [{"region": "Norte", "monto": 10}, {"region": "Sur", "monto": 20}]
+    rep = Report(rows)
+    rep.add_field("importe", "monto")
+    rep.detail("region", "importe")
+    rep.group("por_region", columns="region")
+    rep.section("por_region").total("sum", "importe")
+    rep.group("global")
+    rep.section("global").chart(
+        "pie", title="Pie", operator="sum", column="importe", label_field="region"
+    )
+    rep.section("global").chart(
+        "bar", title="Bar", operator="sum", column="importe", label_field="region"
+    )
+    rep.section("global").chart(
+        "line", title="Line", operator="sum", column="importe", label_field="region"
+    )
+    html = rep.run().render_html()
+
+    assert html.count("<svg") == 3
+    assert "chart-pie" in html and "chart-bar" in html and "chart-line" in html
+    assert "<path" in html  # porciones del pie
+    assert "<polyline" in html  # serie de línea
+    assert "<script" not in html and "canvas" not in html

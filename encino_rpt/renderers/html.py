@@ -8,6 +8,7 @@ from collections.abc import Iterator
 
 from ..models import Image, Link
 from ._format import format_value
+from ._svg import render_chart_svg
 from ._walk import walk
 
 _OPS = {
@@ -135,14 +136,9 @@ class HtmlRenderer:
                     )
                 yield f"<tr>{''.join(cells)}</tr>"
             elif event == "chart":
-                summary = "; ".join(
-                    f"{s.label or ''}: {', '.join(map(str, s.values))}"
-                    for s in node.series
-                )
-                yield self._full_row(
-                    "chart",
-                    f"{node.kind} {node.title or ''} — {summary}",
-                    self._ncols(result),
+                yield (
+                    f'<tr class="chart"><td colspan="{self._ncols(result)}">'
+                    f"{render_chart_svg(node)}</td></tr>"
                 )
             elif event == "pivot":
                 yield (
