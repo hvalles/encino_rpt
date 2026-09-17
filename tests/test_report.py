@@ -195,6 +195,39 @@ def test_order_top_suppress():
     assert [c.key["agente"] for c in result.root.children] == ["Bob", "Cid"]
 
 
+def test_order_by_expression_with_custom_function():
+    rows = [
+        {"agente": "Ana", "total": 100},
+        {"agente": "Bob", "total": 300},
+        {"agente": "Cid", "total": 200},
+    ]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "total", name="total_agt")
+    rep.group("global")
+    rep.add_function("doblado", lambda v: v * 2)
+    rep.section("global").order_by(expression="doblado(total)", direction="desc")
+    result = rep.run()
+
+    assert [c.key["agente"] for c in result.root.children] == ["Bob", "Cid", "Ana"]
+
+
+def test_order_by_missing_total_raises():
+    rows = [
+        {"agente": "Ana", "total": 100},
+        {"agente": "Bob", "total": 300},
+        {"agente": "Cid", "total": 200},
+    ]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "total", name="total_agt")
+    rep.group("global")
+    rep.section("global").order_by(total="total_inexistente")
+
+    with pytest.raises(ValueError, match="total de orden inexistente: 'total_inexistente'"):
+        rep.run()
+
+
 def test_link_and_image():
     rows = [{"id": 1, "sku": "A1"}]
     rep = Report(rows)
