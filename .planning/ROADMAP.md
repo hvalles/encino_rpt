@@ -33,7 +33,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. `order_by(total=...)` con un total inexistente lanza un error claro que nombra el total, en lugar de un `TypeError` crudo.
   4. El sanitizer CSV detecta caracteres peligrosos precedidos de espacio/BOM — `" =1+1"` y `"\x0c=1+1"` quedan saneados.
   5. `encino-orm` se elimina de `pyproject.toml`; una instalación nueva ya no arrastra esa dependencia.
-**Plans**: TBD
+**Plans**: 3 planes
+
+Plans:
+- [ ] 01-01-PLAN.md — Precisión de `format_value` (CORR-02) + sanitizer whitespace/BOM (SEC-02)
+- [ ] 01-02-PLAN.md — `order_by` con funciones custom y error de total ausente (CORR-04, CORR-05)
+- [ ] 01-03-PLAN.md — Eliminar `encino-orm` y limpiar docs (DEP-01)
 
 ### Phase 2: Correctness Crítico
 **Goal**: La agregación y la salida Excel son correctas — `run()` es idempotente, los rangos `SUM` cubren solo filas de detalle, y toda celda Excel pasa por sanitización anti-inyección.
@@ -113,7 +118,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Quick Wins (Corrección low-risk) | TBD | Not started | - |
+| 1. Quick Wins (Corrección low-risk) | 0/3 | Not started | - |
 | 2. Correctness Crítico | TBD | Not started | - |
 | 3. Robustez | TBD | Not started | - |
 | 4. Seguridad | TBD | Not started | - |
