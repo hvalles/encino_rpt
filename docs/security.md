@@ -31,7 +31,10 @@ Para evitar consumo excesivo de CPU/memoria con entradas no confiables:
 
 Los renderers de Excel y CSV neutralizan celdas cuyo valor empieza con
 `=`, `+`, `-`, `@`, tabulador o retorno de carro, para que Excel/Calc no las
-interprete como fórmulas:
+interprete como fórmulas. La detección ignora los espacios en blanco y BOM
+(`\ufeff`) iniciales antes de comprobar los prefijos, de modo que un valor
+como `" =1+1"` o `"\ufeff@evil"` también se neutraliza. La misma detección
+aplica a ambos formatos (fuente única compartida):
 
 - **CSV**: se prefija una comilla simple (`'`).
 - **Excel**: se fuerza el tipo de celda a texto (`data_type = "s"`).
