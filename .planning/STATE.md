@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-tests-ci-02-PLAN.md
-last_updated: "2026-09-17T04:00:30.104Z"
+stopped_at: Completed 08-tests-ci-03-PLAN.md
+last_updated: "2026-09-17T04:05:09.419Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 13
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 ## Current Position
 
 Phase: 08 (Tests & CI) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [███████░░░] 71%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [███████░░░] 71%
 *Updated after each plan completion*
 | Phase 8 P1 | 8min | 2 tasks | 1 files |
 | Phase 8 P2 | 5min | 3 tasks | 3 files |
+| Phase 08 P03 | 4min | 2 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ Recent decisions affecting current work:
 - Añadir renderer JSON con schema versionado.
 - [Phase 8]: Los bugs no-corregidos del engine se documentan con tests de regresión (assert comportamiento actual + comentario # CONCERNS.md), no se corrigen en esta fase
 - [Phase 8]: Los bugs no-corregidos (JSON profundo, params muertos Excel, null byte) se documentan con assert del comportamiento actual + comentario # CONCERNS.md; TEST-02 no se marca completo (08-02 solo aporta el gate de smoke de rendimiento)
+- [Phase 08]: mypy 2.3.1 elegido (no 1.x) — el plugin pydantic.mypy carga sin error; ruff format scoped a encino_rpt tests (nunca .) para no barrer los .md de .planning/ y docs/
+- [Phase 08]: TEST-02 NO se marca completo en 08-03: solo aporta tooling + normalización; los jobs de CI (type check, format gate, coverage gate) aterrizan en 08-04
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T04:00:30.092Z
-Stopped at: Completed 08-tests-ci-02-PLAN.md
+Last session: 2026-09-17T04:05:09.406Z
+Stopped at: Completed 08-tests-ci-03-PLAN.md
 Resume file: None

@@ -149,7 +149,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08-03-PLAN.md — Tooling config (mypy + pytest-cov + secciones `[tool.*]`) + normalización one-time de `ruff format` (TEST-02)
+- [x] 08-03-PLAN.md — Tooling config (mypy + pytest-cov + secciones `[tool.*]`) + normalización one-time de `ruff format` (TEST-02)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -169,4 +169,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Rendimiento | - | Complete (directa) | 2026-09-16 |
 | 6. Features | - | Complete (directa) | 2026-09-16 |
 | 7. Refactor | - | Complete (directa) | 2026-09-16 |
-| 8. Tests & CI | 2/4 | In Progress|  |
+| 8. Tests & CI | 3/4 | In Progress|  |
