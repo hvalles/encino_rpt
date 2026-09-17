@@ -435,3 +435,59 @@ def test_path_group_deep_no_recursion():
     assert node.children[0].row["monto"] == 7
     assert depth == n
 
+
+# --- regresiones TEST-01 (multi-dataset y no-op) ---
+def test_multi_dataset_source():
+    primary = [{"agente": "Ana", "monto": 100}]
+    rep = Report(primary)
+    rep.add_dataset("presupuesto", [
+        {"agente": "Bob", "monto": 10},
+        {"agente": "Cid", "monto": 20},
+    ])
+    rep.group("por_agente", columns="agente", source="presupuesto")
+    rep.section("por_agente").total("sum", "monto")
+    rep.group("global")
+    result = rep.run()
+
+    assert [c.key["agente"] for c in result.root.children] == ["Bob", "Cid"]
+    assert [c.totals[0].value for c in result.root.children] == [10, 20]
+
+
+def test_suppress_zero_missing_column():
+    # regresión documenta bug conocido — ver CONCERNS.md §Known Bugs (suppress_zero)
+    rows = [
+        {"agente": "Ana", "monto": 100},
+        {"agente": "Bob", "monto": 200},
+    ]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "monto")
+    rep.group("global")
+    rep.section("global").suppress_zero(column="columna_inexistente")
+    result = rep.run()
+
+    assert len(result.root.children) == 0
+
+
+@pytest.mark.xfail(strict=True, reason="bug conocido — ver CONCERNS.md §Known Bugs (detail(source=...) ignorado)")
+def test_detail_source_ignored():
+    primary = [{"sku": "A", "monto": 100}]
+    secondary = [{"sku": "B", "monto": 999}]
+    rep = Report(primary)
+    rep.add_dataset("presupuesto", secondary)
+    rep.detail("sku", "monto", source="presupuesto")
+    result = rep.run()
+
+    assert result.root.children[0].row["sku"] == "B"
+
+
+def test_count_expression_semantics():
+    # regresión documenta bug conocido — ver CONCERNS.md §Known Bugs (count truthy vs rows)
+    rows = [{"monto": 10}, {"monto": -5}, {"monto": 0}]
+    rep = Report(rows)
+    rep.group("global")
+    rep.section("global").total("count", expression="monto > 0")
+    result = rep.run()
+
+    assert result.root.totals[0].value == 1
+
