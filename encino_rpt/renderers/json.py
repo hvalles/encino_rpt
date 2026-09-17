@@ -41,10 +41,20 @@ class JsonRenderer:
             ValueError: Si la jerarquía es demasiado profunda para serializar a
                 JSON; la serialización recursiva de pydantic excede su límite de
                 profundidad y en vez de exponer un `RecursionError` se lanza un
-                error controlado.
+                error controlado. Otros errores de serialización (p. ej. valores
+                no serializables) se propagan sin modificar.
         """
         try:
             data = result.model_dump(mode="json")
-        except (RecursionError, ValueError) as exc:
+        except RecursionError as exc:
             raise ValueError(_DEPTH_ERROR) from exc
+        except ValueError as exc:
+            if _is_depth_error(exc):
+                raise ValueError(_DEPTH_ERROR) from exc
+            raise
         return {"schema_version": SCHEMA_VERSION, **data}
+
+
+def _is_depth_error(exc: ValueError) -> bool:
+    msg = str(exc).lower()
+    return "depth" in msg or "circular" in msg or "recursi" in msg

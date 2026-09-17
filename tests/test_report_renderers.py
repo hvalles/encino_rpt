@@ -448,6 +448,18 @@ def test_deep_tree_to_json():
         result.to_json()
 
 
+def test_to_json_non_serializable_not_masked():
+    # MA-01: un valor no serializable no debe relabelarse como "demasiado profunda".
+    rows = [{"sku": object(), "monto": 1}]
+    rep = Report(rows)
+    rep.detail("sku", "monto")
+    result = rep.run()
+
+    with pytest.raises(ValueError) as exc:
+        result.to_json()
+    assert "demasiado profunda" not in str(exc.value)
+
+
 def test_excel_styles_footer_dead_params():
     pytest.importorskip("openpyxl")
     # regresión documenta bug conocido — ver CONCERNS.md §Tech Debt

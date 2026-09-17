@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from ._specs import GroupSpec
@@ -72,7 +73,9 @@ def _value_for(operator, column, expression, rows, functions, aggregates):
     """Calcula el valor de un agregado sobre `rows`.
 
     Semántica de `count`:
-    - `count` sin `expression` cuenta filas (`len(rows)`).
+    - `count` sin `expression` y sin `column` cuenta filas (`len(rows)`).
+    - `count` con `column` (sin `expression`) cuenta los valores no-`None` de
+      esa columna.
     - `count` con `expression` es un conteo condicional: cuenta las filas cuya
       expresión evalúa *truthy* (las filas con resultado falsy —0, None, False—
       no se cuentan).
@@ -596,8 +599,6 @@ def build(report) -> ReportResult:
             "usa `group(..., source=...)`"
         )
     if report._detail_source is not None:
-        from dataclasses import replace
-
         root_spec = replace(root_spec, source=report._detail_source)
     registry: dict[str, Any] = {}
     deferred: list[tuple[Total, Any, Any, str]] = []
