@@ -14,6 +14,9 @@ dist/
 # Documentación generada
 site/
 
+# Salidas de los ejemplos
+examples/output/
+
 # Pruebas y cobertura
 .pytest_cache/
 .coverage

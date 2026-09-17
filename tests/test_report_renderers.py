@@ -704,3 +704,16 @@ def test_serialization_decimal_datetime():
     assert row["monto"] == "100.50"
     assert row["fecha"] == "2024-01-02T00:00:00+00:00"
     assert ReportResult.from_dict(d).to_dict() == d
+
+
+def test_excel_conditional_color_css_hex():
+    # regresión: un color CSS `#RRGGBB` se normaliza a aRGB para openpyxl
+    # (antes lanzaba "Colors must be aRGB hex values").
+    pytest.importorskip("openpyxl")
+    rows = [{"monto": 100}, {"monto": 50}]
+    rep = Report(rows)
+    rep.detail("monto")
+    rep.add_style("monto", when="gt", value=80, color="#00aa77")
+    ws = rep.run().to_excel()
+    vals = [c.value for row in ws.iter_rows() for c in row]
+    assert "monto" in vals

@@ -40,7 +40,7 @@ print(result.render_html())
 - **KPIs**, **formato numérico** (moneda, `%`, miles, paréntesis, fechas) y
   **formato condicional**.
 - **Multi-query** (`add_dataset` + `source=`) para sub-reportes.
-- Salida **renderer-agnóstica**: un único árbol alimenta JSON (`model_dump()`),
+- Salida **renderer-agnóstica**: un único árbol alimenta JSON (`to_json()`/`to_dict()`),
   HTML, Excel, CSV, PDF y texto.
 - **Mitigaciones de seguridad** integradas: evaluador sin `eval`, anti-DoS en
   expresiones y protección contra inyección de fórmulas en Excel/CSV.
@@ -88,7 +88,18 @@ result.to_csv()           # CSV
 result.to_text()          # texto plano
 result.to_excel()         # hoja openpyxl (requiere extra `excel`)
 result.to_pdf()           # bytes PDF (requiere extra `pdf`)
-result.model_dump()       # JSON canónico
+result.to_json()          # JSON canónico (schema_version)
+```
+
+## Ejemplos
+
+En [`examples/`](examples/) hay **13 ejemplos autocontenidos** (datos en CSV/JSON)
+que cubren desde una tabla básica hasta grupos anidados, pivotes, gráficos, KPIs,
+multi-dataset, Markdown y streaming. Índice completo en
+[`examples/README.md`](examples/README.md).
+
+```bash
+uv run python examples/01_tabla_basica.py
 ```
 
 ## Documentación

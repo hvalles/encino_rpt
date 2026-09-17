@@ -63,7 +63,7 @@ print(result.to_csv())        # CSV
 print(result.to_text())       # texto plano
 result.to_excel()             # hoja openpyxl (extra `excel`)
 result.to_pdf()               # bytes PDF (extra `pdf`)
-result.model_dump()           # JSON canónico
+result.to_json()              # JSON canónico (schema_version)
 ```
 
 ## Siguiente paso

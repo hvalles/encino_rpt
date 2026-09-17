@@ -16,6 +16,23 @@ _COLOR_OPS = {
     "ne": lambda a, b: a != b,
 }
 
+_HEX = set("0123456789abcdefABCDEF")
+
+
+def _argb(color):
+    """Normaliza un color CSS (`#RRGGBB`/`#RGB`) al aRGB que exige openpyxl.
+
+    Deja intactos los valores que no son hex de 3/6 dígitos (p. ej. ya aRGB).
+    """
+    if not isinstance(color, str):
+        return color
+    c = color.lstrip("#")
+    if len(c) == 3 and set(c) <= _HEX:
+        c = "".join(ch * 2 for ch in c)
+    if len(c) == 6 and set(c) <= _HEX:
+        return "FF" + c
+    return color
+
 
 class ExcelRenderer:
     """Renderiza el `ReportResult` a una hoja de Excel (openpyxl)."""
@@ -206,7 +223,7 @@ class ExcelRenderer:
                 if rule.style.get("bold"):
                     bold = True
         if color or bold:
-            cell.font = Font(color=color, bold=bold)
+            cell.font = Font(color=_argb(color), bold=bold)
 
     def _chart(self, node):
         from openpyxl.chart import BarChart, LineChart, PieChart, Reference
