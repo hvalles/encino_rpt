@@ -27,27 +27,29 @@ Producir reportes financieros **correctos y seguros**: la agregación y el rende
 - ✓ CSV sanitizer resiste espacios/BOM previos a caracteres peligrosos — Validado en Fase 1 (SEC-02)
 - ✓ `order_by` funciona con `expression=` (funciones custom) y con total ausente (error claro) — Validado en Fase 1 (CORR-04/CORR-05)
 - ✓ Dependencia muerta `encino-orm` eliminada — Validado en Fase 1 (DEP-01)
+- ✓ `run()` es idempotente (re-ejecutar no duplica grupos) — implementación directa (CORR-01)
+- ✓ Excel `formulas=True` no doble-conta subtotales ni datos auxiliares de chart — directa (CORR-03)
+- ✓ Totales, headers y celdas de Excel pasan por sanitización anti-inyección — directa (SEC-01)
+- ✓ Errores de agregación reportan contexto (grupo/campo/fila) — directa (CORR-06)
+- ✓ `source=` desconocido y tokens `{{...}}` sin resolver fallan, no callan — directa (CORR-07)
+- ✓ Evaluador de expresiones robusto ante exponentes float y expresiones patológicas — directa (SEC-04)
+- ✓ Estilos HTML condicionales no permiten inyección CSS vía `;` — directa (SEC-03)
+- ✓ Pivot calcula totales en una sola pasada (sin O(rows × uniques)) — directa (PERF-01)
+- ✓ Grupos por ruta usan builder iterativo (sin límite de recursión ~1000) — directa (PERF-02)
+- ✓ Link/Image se renderizan como enlace/imagen en HTML/Excel/CSV/PDF — directa (FEAT-01)
+- ✓ `page_break`, `repeat_header` (HTML), `column_position` y `show_collapsed`/`default_collapsed` tienen efecto real — directa (FEAT-02)
+- ✓ Traversal de renderers compartido (iterador único) — directa (REF-01)
+- ✓ `GroupSpec` tratado como inmutable + validación up-front — directa (REF-02)
+- ✓ Renderer JSON con schema versionado (export estable + round-trip validado) — directa (JSON-01)
 
 ### Active
 
 <!-- Endurecer + completar + feature nueva. Hipótesis hasta que se validen. -->
 
-- [ ] `run()` es idempotente (re-ejecutar no duplica grupos)
-- [ ] Excel `formulas=True` no doble-conta subtotales ni datos auxiliares de chart
-- [ ] Totales, headers y celdas de Excel pasan por sanitización anti-inyección
-- [ ] Errores de agregación reportan contexto (grupo/campo/fila), no excepciones crudas
-- [ ] `source=` desconocido y tokens `{{...}}` sin resolver fallan o avisan, no callan
-- [ ] Evaluador de expresiones robusto ante exponentes float y expresiones patológicas
-- [ ] Estilos HTML condicionales no permiten inyección CSS vía `;`
-- [ ] Pivot calcula totales en una sola pasada (sin O(rows × uniques))
-- [ ] Grupos por ruta usan builder iterativo (sin límite de recursión ~1000)
-- [ ] Link/Image se renderizan como enlace/imagen en HTML/Excel/CSV/PDF
-- [ ] `page_break`, `repeat_header` (HTML), `column_position` y `show_collapsed`/`default_collapsed` tienen efecto real
-- [ ] Traversal de renderers compartido (iterador único en lugar de 5 copias divergentes)
-- [ ] `GroupSpec` tratado como inmutable + validación up-front (nombres duplicados, `parent` antes de hijo, `custom:` registrado)
-- [ ] Renderer JSON con schema versionado (export estable + round-trip validado)
-- [ ] Cobertura de tests de regresión para todos los fixes
-- [ ] CI con type checker, `ruff format --check`, gate de cobertura y smoke de rendimiento
+- [ ] Cobertura de tests de regresión consolidada para todos los fixes (TEST-01)
+- [ ] CI con type checker, `ruff format --check`, gate de cobertura y smoke de rendimiento (TEST-02)
+- [ ] `suppress_zero` con columna inexistente no suprime silenciosamente todo el grupo (`_is_zero` devuelve `True` cuando falta la columna)
+- [ ] Tests de camino feliz para multi-dataset (`add_dataset` + `source=`)
 
 ### Out of Scope
 
@@ -61,7 +63,7 @@ Producir reportes financieros **correctos y seguros**: la agregación y el rende
 
 - **Código existente mapeado** en `.planning/codebase/` (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, INTEGRATIONS, CONCERNS).
 - **Análisis de concerns** en `.planning/codebase/CONCERNS.md`: 196 líneas de hallazgos validados contra el código (bugs de correctness/seguridad, deuda, rendimiento, gaps de features y de tests).
-- **Plan de oleadas 0–7** derivado de ese análisis (corrección primero): quick wins → correctness → robustez → seguridad → rendimiento → features → refactor → tests/CI.
+- **Plan de oleadas 0–7** derivado de ese análisis (corrección primero): quick wins → correctness → robustez → seguridad → rendimiento → features → refactor → tests/CI. Fases 1-7 implementadas (1 vía GSD; 2-7 directo, ver `ROADMAP.md`); pendiente Fase 8 (Tests & CI).
 - **Diseño de referencia** en `docs/design/10-report.md` (contrato §8 para Link/Image, `page_break`, `repeat_header`, `column_position`, `show_collapsed`/`default_collapsed`).
 - Proyecto PyPI `encino-rpt` (v0.2.1), licencia MIT, `requires-python >=3.10`.
 
@@ -76,10 +78,10 @@ Producir reportes financieros **correctos y seguros**: la agregación y el rende
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Estructura por oleadas (corrección primero) | Priorizar correctness/seguridad sobre features nuevas | — Pending |
-| Implementar features (no eliminar campos muertos) | Alineado con el contrato de `docs/design/10-report.md` §8 | — Pending |
+| Estructura por oleadas (corrección primero) | Priorizar correctness/seguridad sobre features nuevas | Done (Fases 1-7) |
+| Implementar features (no eliminar campos muertos) | Alineado con el contrato de `docs/design/10-report.md` §8 | Done (FEAT-01/FEAT-02) |
 | Quitar `encino-orm` | Dependencia de runtime sin uso (nada lo importa) | Done (Fase 1/DEP-01) |
-| Añadir renderer JSON con schema versionado | Export estable + round-trip validado, más allá de `model_dump()` crudo | — Pending |
+| Añadir renderer JSON con schema versionado | Export estable + round-trip validado, más allá de `model_dump()` crudo | Done (JSON-01) |
 
 ## Evolution
 
@@ -99,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-17 after Phase 1 (Quick Wins — Corrección low-risk)*
+*Last updated: 2026-09-17 after reconciliación (Fases 1-7 completas; pendiente Fase 8)*

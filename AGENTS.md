@@ -268,6 +268,16 @@ Use these entry points:
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
 <!-- GSD:workflow-end -->
 
+<!-- GSD:strategy-start source:STRATEGY.md -->
+## GSD Strategy
+
+Estrategia híbrida "triage por riesgo" (detalle en `.planning/STRATEGY.md`):
+
+1. **Nunca saltes el análisis**: `map-codebase` (CONCERNS) antes de decidir qué hacer; `code-review` + `verifier` al terminar.
+2. **Ceremonia completa sólo con ambigüedad/riesgo** (feature nueva, refactor transversal, seguridad, infra/CI) → `/gsd-execute-phase`. Trabajo mecánico bien entendido → implementación directa.
+3. **Reconciliación obligatoria tras trabajo directo**: sincronizar `.planning/ROADMAP.md`, `STATE.md` y `PROJECT.md` (o vía `/gsd-quick`).
+<!-- GSD:strategy-end -->
+
 
 
 <!-- GSD:profile-start -->

@@ -13,13 +13,13 @@ Hardening de `encino-rpt`, un reporteador financiero que produce un árbol canó
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Quick Wins (Corrección low-risk)** - Fixes de bajo riesgo: precisión de `format_value`, `order_by`, sanitizer CSV, y quitar `encino-orm`
-- [ ] **Phase 2: Correctness Crítico** - `run()` idempotente, SUM de Excel sin doble-conteo, sanitización total en Excel
-- [ ] **Phase 3: Robustez** - Errores con contexto, fallos silenciosos eliminados, evaluador anti-DoS
-- [ ] **Phase 4: Seguridad** - Inyección CSS en estilos condicionales HTML
-- [ ] **Phase 5: Rendimiento** - Pivot en una sola pasada, grupos por ruta iterativos
-- [ ] **Phase 6: Features** - Renderizado Link/Image, campos de layout, renderer JSON versionado
-- [ ] **Phase 7: Refactor** - Traversal compartido, `GroupSpec` inmutable + validación
+- [x] **Phase 1: Quick Wins (Corrección low-risk)** - Fixes de bajo riesgo: precisión de `format_value`, `order_by`, sanitizer CSV, y quitar `encino-orm` *(vía GSD)*
+- [x] **Phase 2: Correctness Crítico** - `run()` idempotente, SUM de Excel sin doble-conteo, sanitización total en Excel *(implementación directa)*
+- [x] **Phase 3: Robustez** - Errores con contexto, fallos silenciosos eliminados, evaluador anti-DoS *(implementación directa)*
+- [x] **Phase 4: Seguridad** - Inyección CSS en estilos condicionales HTML *(implementación directa)*
+- [x] **Phase 5: Rendimiento** - Pivot en una sola pasada, grupos por ruta iterativos *(implementación directa)*
+- [x] **Phase 6: Features** - Renderizado Link/Image, campos de layout, renderer JSON versionado *(implementación directa)*
+- [x] **Phase 7: Refactor** - Traversal compartido, `GroupSpec` inmutable + validación *(implementación directa)*
 - [ ] **Phase 8: Tests & CI** - Tests de regresión consolidados + CI endurecido
 
 ## Phase Details
@@ -148,11 +148,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Quick Wins (Corrección low-risk) | 2/3 | In Progress|  |
-| 2. Correctness Crítico | TBD | Not started | - |
-| 3. Robustez | TBD | Not started | - |
-| 4. Seguridad | TBD | Not started | - |
-| 5. Rendimiento | TBD | Not started | - |
-| 6. Features | TBD | Not started | - |
-| 7. Refactor | TBD | Not started | - |
+| 1. Quick Wins (Corrección low-risk) | 3/3 | Complete | 2026-09-16 |
+| 2. Correctness Crítico | - | Complete (directa) | 2026-09-16 |
+| 3. Robustez | - | Complete (directa) | 2026-09-16 |
+| 4. Seguridad | - | Complete (directa) | 2026-09-16 |
+| 5. Rendimiento | - | Complete (directa) | 2026-09-16 |
+| 6. Features | - | Complete (directa) | 2026-09-16 |
+| 7. Refactor | - | Complete (directa) | 2026-09-16 |
 | 8. Tests & CI | TBD | Not started | - |
