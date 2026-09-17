@@ -80,7 +80,11 @@ def _walk(node, row: dict, functions: dict, depth: int = 0) -> Any:
             raise ExpressionError(f"operador no permitido: {ast.dump(node)}")
         left = _walk(node.left, row, functions, depth + 1)
         right = _walk(node.right, row, functions, depth + 1)
-        if isinstance(node.op, ast.Pow) and isinstance(right, (int, float)) and abs(right) > _MAX_POW_EXP:
+        if (
+            isinstance(node.op, ast.Pow)
+            and isinstance(right, (int, float))
+            and abs(right) > _MAX_POW_EXP
+        ):
             raise ExpressionError("exponente demasiado grande")
         try:
             return op(left, right)

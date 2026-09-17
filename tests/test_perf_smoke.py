@@ -16,7 +16,9 @@ def test_pivot_50k_rows_smoke():
     ]
     rep = Report(rows)
     rep.group("global")
-    rep.section("global").pivot("region", "product", operator="sum", value_column="amount")
+    rep.section("global").pivot(
+        "region", "product", operator="sum", value_column="amount"
+    )
 
     t0 = time.perf_counter()
     result = rep.run()

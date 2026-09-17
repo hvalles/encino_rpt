@@ -129,7 +129,9 @@ def test_phase_b_percentage():
     rep.section("por_agente").total("sum", "total")
     rep.group("global")
     rep.section("global").total("sum", "total", name="total_gral")
-    rep.section("por_agente").total("sum", expression="total / TOTAL('global.total_gral') * 100")
+    rep.section("por_agente").total(
+        "sum", expression="total / TOTAL('global.total_gral') * 100"
+    )
     result = rep.run()
 
     ana, bob = result.root.children
@@ -161,7 +163,9 @@ def test_chart_and_pivot():
     rep.group("por_agente", columns="agente")
     rep.section("por_agente").total("sum", "total")
     rep.group("global")
-    rep.section("global").chart("pie", operator="sum", column="total", label_field="agente")
+    rep.section("global").chart(
+        "pie", operator="sum", column="total", label_field="agente"
+    )
     rep.section("global").pivot("agente", "mes", operator="sum", value_column="total")
     result = rep.run()
 
@@ -224,7 +228,9 @@ def test_order_by_missing_total_raises():
     rep.group("global")
     rep.section("global").order_by(total="total_inexistente")
 
-    with pytest.raises(ValueError, match="total de orden inexistente: 'total_inexistente'"):
+    with pytest.raises(
+        ValueError, match="total de orden inexistente: 'total_inexistente'"
+    ):
         rep.run()
 
 
@@ -239,7 +245,9 @@ def test_order_by_missing_column_raises():
     rep.group("global")
     rep.section("global").order_by(column="columna_inexistente")
 
-    with pytest.raises(ValueError, match="columna de orden inexistente: 'columna_inexistente'"):
+    with pytest.raises(
+        ValueError, match="columna de orden inexistente: 'columna_inexistente'"
+    ):
         rep.run()
 
 
@@ -428,7 +436,11 @@ def test_path_group_deep_no_recursion():
 
     node = result.root
     depth = 0
-    while isinstance(node, Group) and node.children and isinstance(node.children[0], Group):
+    while (
+        isinstance(node, Group)
+        and node.children
+        and isinstance(node.children[0], Group)
+    ):
         node = node.children[0]
         depth += 1
     assert isinstance(node.children[0], Detail)
@@ -440,10 +452,13 @@ def test_path_group_deep_no_recursion():
 def test_multi_dataset_source():
     primary = [{"agente": "Ana", "monto": 100}]
     rep = Report(primary)
-    rep.add_dataset("presupuesto", [
-        {"agente": "Bob", "monto": 10},
-        {"agente": "Cid", "monto": 20},
-    ])
+    rep.add_dataset(
+        "presupuesto",
+        [
+            {"agente": "Bob", "monto": 10},
+            {"agente": "Cid", "monto": 20},
+        ],
+    )
     rep.group("por_agente", columns="agente", source="presupuesto")
     rep.section("por_agente").total("sum", "monto")
     rep.group("global")
@@ -469,7 +484,10 @@ def test_suppress_zero_missing_column():
     assert len(result.root.children) == 0
 
 
-@pytest.mark.xfail(strict=True, reason="bug conocido — ver CONCERNS.md §Known Bugs (detail(source=...) ignorado)")
+@pytest.mark.xfail(
+    strict=True,
+    reason="bug conocido — ver CONCERNS.md §Known Bugs (detail(source=...) ignorado)",
+)
 def test_detail_source_ignored():
     primary = [{"sku": "A", "monto": 100}]
     secondary = [{"sku": "B", "monto": 999}]
@@ -493,7 +511,10 @@ def test_count_expression_semantics():
 
 
 # --- regresiones TEST-01 (crash/error) ---
-@pytest.mark.xfail(strict=True, reason="bug conocido — ver CONCERNS.md §Known Bugs (totales nombrados None)")
+@pytest.mark.xfail(
+    strict=True,
+    reason="bug conocido — ver CONCERNS.md §Known Bugs (totales nombrados None)",
+)
 def test_named_total_none_values():
     rows = [{"monto": None}, {"monto": None}]
     rep = Report(rows)
@@ -516,7 +537,10 @@ def test_unhashable_group_value():
         rep.run()
 
 
-@pytest.mark.xfail(strict=True, reason="bug conocido — ver CONCERNS.md §Fragile Areas (errores chart/pivot sin contexto)")
+@pytest.mark.xfail(
+    strict=True,
+    reason="bug conocido — ver CONCERNS.md §Fragile Areas (errores chart/pivot sin contexto)",
+)
 def test_chart_pivot_error_context():
     from encino_rpt.aggregation import AggregationError
 
@@ -529,4 +553,3 @@ def test_chart_pivot_error_context():
 
     with pytest.raises(AggregationError):
         rep.run()
-

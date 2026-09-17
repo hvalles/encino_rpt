@@ -31,13 +31,13 @@ class Format(BaseModel):
     """Formato de presentación de una columna o total (lo aplican los renderers)."""
 
     kind: Literal["number", "currency", "percent", "date"] = "number"
-    decimals: int | None = None          # None -> no redondea
-    thousands: bool = False              # separador de miles
-    symbol: str | None = None            # p. ej. "$", "€"
+    decimals: int | None = None  # None -> no redondea
+    thousands: bool = False  # separador de miles
+    symbol: str | None = None  # p. ej. "$", "€"
     symbol_position: Literal["prefix", "suffix"] = "prefix"
     negative: Literal["minus", "paren"] = "minus"
-    percent_scale: bool = False          # percent: multiplica por 100 al mostrar
-    pattern: str | None = None           # kind="date": patrón strftime
+    percent_scale: bool = False  # percent: multiplica por 100 al mostrar
+    pattern: str | None = None  # kind="date": patrón strftime
 
 
 class Total(BaseModel):
@@ -147,7 +147,9 @@ class ReportResult(BaseModel):
     kpis: list[Kpi] = Field(default_factory=list)
     root: Group
 
-    def render_html(self, classes: dict | None = None, repeat_header: bool = False) -> str:
+    def render_html(
+        self, classes: dict | None = None, repeat_header: bool = False
+    ) -> str:
         """Renderiza el reporte a una tabla HTML.
 
         Args:

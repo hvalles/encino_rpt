@@ -6,7 +6,9 @@ from encino_rpt.renderers._format import format_value
 
 
 def test_format_value_currency():
-    fmt = Format(kind="currency", symbol="$", decimals=2, thousands=True, negative="paren")
+    fmt = Format(
+        kind="currency", symbol="$", decimals=2, thousands=True, negative="paren"
+    )
     assert format_value(1234.5, fmt) == "$1,234.50"
     assert format_value(-1234.5, fmt) == "($1,234.50)"
 
@@ -46,7 +48,9 @@ def test_format_value_precision_whole_float():
 
 
 def test_format_value_precision_currency():
-    fmt = Format(kind="currency", symbol="$", decimals=None, thousands=True, negative="paren")
+    fmt = Format(
+        kind="currency", symbol="$", decimals=None, thousands=True, negative="paren"
+    )
     assert format_value(-1234567.89, fmt) == "($1,234,567.89)"
 
 
@@ -119,7 +123,9 @@ def test_excel_formulas():
 
     ws = result.to_excel(formulas=True)
     formula_cells = [
-        c.value for row in ws.iter_rows() for c in row
+        c.value
+        for row in ws.iter_rows()
+        for c in row
         if isinstance(c.value, str) and c.value.startswith("=")
     ]
     assert any("SUM" in f for f in formula_cells)
@@ -142,7 +148,9 @@ def test_excel_formulas_no_double_count():
 
     ws = result.to_excel(formulas=True)
     formulas = {
-        c.value for row in ws.iter_rows() for c in row
+        c.value
+        for row in ws.iter_rows()
+        for c in row
         if isinstance(c.value, str) and c.value.startswith("=")
     }
     # subtotales y total global referencian SOLO filas de detalle (sin doble conteo)
@@ -347,4 +355,3 @@ def test_excel_styles_footer_dead_params():
     # styles y column_position son no-op (sin crash); el footer se renderiza como fila completa
     ws = result.to_excel(styles={"bold": True})
     assert "Total" in [c.value for row in ws.iter_rows() for c in row]
-

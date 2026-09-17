@@ -83,14 +83,21 @@ def _value_for(operator, column, expression, rows, functions, aggregates):
 
 def _make_total(spec, value):
     return Total(
-        operator=spec.operator, column=spec.column, expression=spec.expression,
-        name=spec.name, label=spec.label, value=value,
-        format=_as_format(spec.format), column_position=spec.column_position,
+        operator=spec.operator,
+        column=spec.column,
+        expression=spec.expression,
+        name=spec.name,
+        label=spec.label,
+        value=value,
+        format=_as_format(spec.format),
+        column_position=spec.column_position,
     )
 
 
 def _make_value_fn(operator, column, expression, functions, aggregates):
-    return lambda rows: _value_for(operator, column, expression, rows, functions, aggregates)
+    return lambda rows: _value_for(
+        operator, column, expression, rows, functions, aggregates
+    )
 
 
 # --- enriquecimiento ---
@@ -120,7 +127,10 @@ def _enrich(report, source):
                     continue
                 val = _wrap(
                     f"campo {f.name!r} (fila {index})",
-                    evaluate, f.expression, enriched, report._functions,
+                    evaluate,
+                    f.expression,
+                    enriched,
+                    report._functions,
                 )
                 if f.cumulative == "sum":
                     prev = cum.get(f.name, 0 if f.start is None else f.start)
@@ -169,9 +179,7 @@ def _partition(spec, rows):
             index[key] = []
             order.append(key)
         index[key].append(r)
-    return [
-        ({c: v for c, v in zip(spec.columns, key)}, index[key]) for key in order
-    ]
+    return [({c: v for c, v in zip(spec.columns, key)}, index[key]) for key in order]
 
 
 def _build_group(report, spec, sources, registry, deferred, visible, children_map):
@@ -180,7 +188,19 @@ def _build_group(report, spec, sources, registry, deferred, visible, children_ma
         return _build_path_group(report, spec, rows, registry, deferred, visible)
     result = []
     for key, part_rows in _partition(spec, rows):
-        result.append(_build_instance(report, spec, key, part_rows, sources, registry, deferred, visible, children_map))
+        result.append(
+            _build_instance(
+                report,
+                spec,
+                key,
+                part_rows,
+                sources,
+                registry,
+                deferred,
+                visible,
+                children_map,
+            )
+        )
     return result
 
 
@@ -193,8 +213,13 @@ def _compute_totals_into(report, spec, rows, node, registry, deferred):
         else:
             val = _wrap(
                 f"total {ts.name or ts.operator!r} (grupo {spec.name!r})",
-                _value_for, ts.operator, ts.column, ts.expression, rows,
-                report._functions, report._aggregates,
+                _value_for,
+                ts.operator,
+                ts.column,
+                ts.expression,
+                rows,
+                report._functions,
+                report._aggregates,
             )
             total = _make_total(ts, val)
             node.totals.append(total)
@@ -250,7 +275,8 @@ def _make_path_node(report, spec, rows, registry, deferred, visible):
         tnode = stack.pop()
         if tnode is not trie:
             g = Group(
-                name=spec.name, key={spec.path: tnode.path},
+                name=spec.name,
+                key={spec.path: tnode.path},
                 show_collapsed=spec.show_collapsed,
                 default_collapsed=spec.default_collapsed,
                 page_break=spec.page_break,
@@ -274,9 +300,12 @@ def _make_path_node(report, spec, rows, registry, deferred, visible):
     return [(groups[trie.children[seg]], trie.children[seg].rows) for seg in trie.order]
 
 
-def _build_instance(report, spec, key, rows, sources, registry, deferred, visible, children_map):
+def _build_instance(
+    report, spec, key, rows, sources, registry, deferred, visible, children_map
+):
     node = Group(
-        name=spec.name, key=key,
+        name=spec.name,
+        key=key,
         show_collapsed=spec.show_collapsed,
         default_collapsed=spec.default_collapsed,
         page_break=spec.page_break,
@@ -290,7 +319,17 @@ def _build_instance(report, spec, key, rows, sources, registry, deferred, visibl
     child_specs = children_map.get(spec.name, [])
     if child_specs:
         for child_spec in child_specs:
-            child_pairs.extend(_build_group(report, child_spec, sources, registry, deferred, visible, children_map))
+            child_pairs.extend(
+                _build_group(
+                    report,
+                    child_spec,
+                    sources,
+                    registry,
+                    deferred,
+                    visible,
+                    children_map,
+                )
+            )
         node.children = [n for n, _ in child_pairs]
     else:
         node.children = [
@@ -306,12 +345,18 @@ def _build_instance(report, spec, key, rows, sources, registry, deferred, visibl
     # charts y pivots al final
     extras = []
     for cs in spec.charts:
-        fn = _make_value_fn(cs.operator, cs.column, cs.expression,
-                            report._functions, report._aggregates)
+        fn = _make_value_fn(
+            cs.operator, cs.column, cs.expression, report._functions, report._aggregates
+        )
         extras.append(build_chart(cs, child_pairs, node.totals, fn))
     for ps in spec.pivots:
-        fn = _make_value_fn(ps.operator, ps.value_column, ps.value_expression,
-                            report._functions, report._aggregates)
+        fn = _make_value_fn(
+            ps.operator,
+            ps.value_column,
+            ps.value_expression,
+            report._functions,
+            report._aggregates,
+        )
         extras.append(build_pivot(ps, rows, fn))
     node.children = node.children + extras
 
@@ -322,7 +367,9 @@ def _apply_order(spec, children, functions):
     if spec.order_by:
         ob = spec.order_by
         reverse = ob.get("direction") == "desc"
-        children = sorted(children, key=lambda c: _sort_key(c, ob, functions), reverse=reverse)
+        children = sorted(
+            children, key=lambda c: _sort_key(c, ob, functions), reverse=reverse
+        )
     if spec.suppress_zero:
         sz = spec.suppress_zero
         children = [c for c in children if not _is_zero(c, sz)]
@@ -332,7 +379,11 @@ def _apply_order(spec, children, functions):
 
 
 def _child_desc(child) -> str:
-    return getattr(child, "name", None) or getattr(child, "key", None) or type(child).__name__
+    return (
+        getattr(child, "name", None)
+        or getattr(child, "key", None)
+        or type(child).__name__
+    )
 
 
 def _sort_key(child, ob, functions):
@@ -343,19 +394,27 @@ def _sort_key(child, ob, functions):
         for t in getattr(child, "totals", []):
             if t.name == total:
                 return t.value
-        raise ValueError(f"total de orden inexistente: {total!r} (hijo {_child_desc(child)!r})")
+        raise ValueError(
+            f"total de orden inexistente: {total!r} (hijo {_child_desc(child)!r})"
+        )
     if expression:
         return evaluate(expression, getattr(child, "_first_row", {}), functions)
     if column:
         if isinstance(child, Group):
             if child.key is None or column not in child.key:
-                raise ValueError(f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})")
+                raise ValueError(
+                    f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})"
+                )
             return child.key[column]
         if isinstance(child, Detail):
             if column not in child.row:
-                raise ValueError(f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})")
+                raise ValueError(
+                    f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})"
+                )
             return child.row[column]
-        raise ValueError(f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})")
+        raise ValueError(
+            f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})"
+        )
     return 0
 
 
@@ -385,7 +444,13 @@ def _resolve_deferred(deferred, functions, aggregates, registry):
     for total, spec, rows, group_name in deferred:
         total.value = _wrap(
             f"total {spec.name or spec.operator!r} (grupo {group_name!r})",
-            _value_for, spec.operator, spec.column, spec.expression, rows, fns, aggregates,
+            _value_for,
+            spec.operator,
+            spec.column,
+            spec.expression,
+            rows,
+            fns,
+            aggregates,
         )
 
 
@@ -420,8 +485,13 @@ def _build_kpis(report, sources):
             rows = sources.get(spec.source, sources[None])
             value = _wrap(
                 f"kpi {spec.label!r}",
-                _value_for, spec.operator, spec.column, spec.expression, rows,
-                report._functions, report._aggregates,
+                _value_for,
+                spec.operator,
+                spec.column,
+                spec.expression,
+                rows,
+                report._functions,
+                report._aggregates,
             )
         kpis.append(Kpi(label=spec.label, value=value, format=_as_format(spec.format)))
     return kpis
@@ -470,7 +540,9 @@ def build(report) -> ReportResult:
     root_spec, children_map = _build_group_tree(report)
     registry = {}
     deferred = []
-    root_nodes = _build_group(report, root_spec, sources, registry, deferred, visible_set, children_map)
+    root_nodes = _build_group(
+        report, root_spec, sources, registry, deferred, visible_set, children_map
+    )
 
     root = root_nodes[0][0] if root_nodes else Group(name="global", key=None)
 

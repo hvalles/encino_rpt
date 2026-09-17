@@ -37,7 +37,11 @@ def format_value(value, fmt) -> str:
         if fmt.kind == "percent":
             text = f"{text}%"
         if fmt.symbol:
-            text = (fmt.symbol + text) if fmt.symbol_position == "prefix" else (text + fmt.symbol)
+            text = (
+                (fmt.symbol + text)
+                if fmt.symbol_position == "prefix"
+                else (text + fmt.symbol)
+            )
         if neg:
             text = f"({text})" if fmt.negative == "paren" else f"-{text}"
         return text

@@ -173,4 +173,6 @@ def test_excel_formula_mode_no_user_injection():
     assert ws["A2"].value == "=1+1"
     assert ws["A2"].data_type == "s"
     # solo la fórmula SUM interna (generada por índices de fila) es fórmula viva
-    assert [c.value for row in ws.iter_rows() for c in row if c.data_type == "f"] == ["=SUM(B2)"]
+    assert [c.value for row in ws.iter_rows() for c in row if c.data_type == "f"] == [
+        "=SUM(B2)"
+    ]

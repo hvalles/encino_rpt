@@ -16,7 +16,9 @@ class Report:
     `run()` materializa el árbol canónico (`ReportResult`).
     """
 
-    def __init__(self, rows: list[dict], params: list | None = None, title: str | None = None):
+    def __init__(
+        self, rows: list[dict], params: list | None = None, title: str | None = None
+    ):
         """Crea un reporte.
 
         Args:
@@ -32,7 +34,7 @@ class Report:
         self._fields: list[FieldSpec] = []
         self._detail: list[str] = []
         self._groups: dict[str, GroupSpec] = {}
-        self._order: list[str] = []          # orden de declaración de los cortes
+        self._order: list[str] = []  # orden de declaración de los cortes
         self._formats: dict[str, Format] = {}
         self._styles: list[ConditionalRule] = []
         self._datasets: dict[str, list[dict]] = {}
@@ -65,11 +67,19 @@ class Report:
         self._aggregates[name] = fn
         return self
 
-    def set_format(self, column: str, *, kind: str = "number",
-                   decimals: int | None = None, thousands: bool = False,
-                   symbol: str | None = None, symbol_position: str = "prefix",
-                   negative: str = "minus", percent_scale: bool = False,
-                   pattern: str | None = None) -> Report:
+    def set_format(
+        self,
+        column: str,
+        *,
+        kind: str = "number",
+        decimals: int | None = None,
+        thousands: bool = False,
+        symbol: str | None = None,
+        symbol_position: str = "prefix",
+        negative: str = "minus",
+        percent_scale: bool = False,
+        pattern: str | None = None,
+    ) -> Report:
         """Registra el formato de presentación de una columna.
 
         Args:
@@ -87,14 +97,20 @@ class Report:
             El propio reporte (fluido).
         """
         self._formats[column] = Format(
-            kind=kind, decimals=decimals, thousands=thousands, symbol=symbol,
-            symbol_position=symbol_position, negative=negative,
-            percent_scale=percent_scale, pattern=pattern,
+            kind=kind,
+            decimals=decimals,
+            thousands=thousands,
+            symbol=symbol,
+            symbol_position=symbol_position,
+            negative=negative,
+            percent_scale=percent_scale,
+            pattern=pattern,
         )
         return self
 
-    def add_style(self, column: str | None = None, *, when: str = "lt",
-                  value: Any = 0, **style) -> Report:
+    def add_style(
+        self, column: str | None = None, *, when: str = "lt", value: Any = 0, **style
+    ) -> Report:
         """Registra una regla de formato condicional por valor.
 
         Args:
@@ -106,7 +122,9 @@ class Report:
         Returns:
             El propio reporte (fluido).
         """
-        self._styles.append(ConditionalRule(column=column, when=when, value=value, style=style))
+        self._styles.append(
+            ConditionalRule(column=column, when=when, value=value, style=style)
+        )
         return self
 
     def add_dataset(self, name: str, rows: list[dict]) -> Report:
@@ -122,9 +140,17 @@ class Report:
         self._datasets[name] = list(rows)
         return self
 
-    def kpi(self, label: str, *, operator: str = "sum", column: str | None = None,
-            expression: str | None = None, value: Any = None,
-            format=None, source: str | None = None) -> Report:
+    def kpi(
+        self,
+        label: str,
+        *,
+        operator: str = "sum",
+        column: str | None = None,
+        expression: str | None = None,
+        value: Any = None,
+        format=None,
+        source: str | None = None,
+    ) -> Report:
         """Declara una tarjeta de indicador (KPI) en el resumen.
 
         Args:
@@ -139,13 +165,22 @@ class Report:
         Returns:
             El propio reporte (fluido).
         """
-        self._kpis.append(KpiSpec(label, operator, column, expression, value, format, source))
+        self._kpis.append(
+            KpiSpec(label, operator, column, expression, value, format, source)
+        )
         return self
 
-    def add_field(self, name: str, expression: str | None = None, *,
-                  after: str | None = None, format=None,
-                  cumulative: str | None = None, start: Any = 0,
-                  source: str | None = None) -> Report:
+    def add_field(
+        self,
+        name: str,
+        expression: str | None = None,
+        *,
+        after: str | None = None,
+        format=None,
+        cumulative: str | None = None,
+        start: Any = 0,
+        source: str | None = None,
+    ) -> Report:
         """Declara una columna calculada.
 
         Args:
@@ -161,13 +196,28 @@ class Report:
             El propio reporte (fluido).
         """
         self._fields.append(
-            FieldSpec(name=name, expression=expression, after=after, kind="expr",
-                      format=format, cumulative=cumulative, start=start, source=source)
+            FieldSpec(
+                name=name,
+                expression=expression,
+                after=after,
+                kind="expr",
+                format=format,
+                cumulative=cumulative,
+                start=start,
+                source=source,
+            )
         )
         return self
 
-    def link(self, name: str, target: str, href: str, label: str | None = None,
-             *, after: str | None = None) -> Report:
+    def link(
+        self,
+        name: str,
+        target: str,
+        href: str,
+        label: str | None = None,
+        *,
+        after: str | None = None,
+    ) -> Report:
         """Declara una columna de enlace.
 
         Args:
@@ -181,13 +231,27 @@ class Report:
             El propio reporte (fluido).
         """
         self._fields.append(
-            FieldSpec(name=name, after=after, kind="link", target=target, href=href, label=label)
+            FieldSpec(
+                name=name,
+                after=after,
+                kind="link",
+                target=target,
+                href=href,
+                label=label,
+            )
         )
         return self
 
-    def image(self, name: str, src: str, *, alt: str | None = None,
-              width: int | None = None, height: int | None = None,
-              after: str | None = None) -> Report:
+    def image(
+        self,
+        name: str,
+        src: str,
+        *,
+        alt: str | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        after: str | None = None,
+    ) -> Report:
         """Declara una columna de imagen.
 
         Args:
@@ -202,8 +266,15 @@ class Report:
             El propio reporte (fluido).
         """
         self._fields.append(
-            FieldSpec(name=name, after=after, kind="image", src=src, alt=alt,
-                      width=width, height=height)
+            FieldSpec(
+                name=name,
+                after=after,
+                kind="image",
+                src=src,
+                alt=alt,
+                width=width,
+                height=height,
+            )
         )
         return self
 
@@ -221,13 +292,18 @@ class Report:
         self._detail = list(columns)
         return self
 
-    def group(self, name: str,
-              columns: str | list[str] | tuple[str, ...] | None = None, *,
-              parent: str | None = None,
-              show_collapsed: bool = False,
-              default_collapsed: bool = False,
-              path: str | None = None, separator: str = ".",
-              source: str | None = None) -> Section:
+    def group(
+        self,
+        name: str,
+        columns: str | list[str] | tuple[str, ...] | None = None,
+        *,
+        parent: str | None = None,
+        show_collapsed: bool = False,
+        default_collapsed: bool = False,
+        path: str | None = None,
+        separator: str = ".",
+        source: str | None = None,
+    ) -> Section:
         """Crea (o devuelve) un corte.
 
         Args:
@@ -252,8 +328,13 @@ class Report:
         if columns is not None:
             cols = [columns] if isinstance(columns, str) else list(columns)
         spec = GroupSpec(
-            name=name, columns=cols, parent=parent, path=path, separator=separator,
-            show_collapsed=show_collapsed, default_collapsed=default_collapsed,
+            name=name,
+            columns=cols,
+            parent=parent,
+            path=path,
+            separator=separator,
+            show_collapsed=show_collapsed,
+            default_collapsed=default_collapsed,
             source=source,
         )
         self._groups[name] = spec

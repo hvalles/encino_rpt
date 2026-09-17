@@ -37,10 +37,17 @@ class Section:
         self._spec.footer_column_position = column_position
         return self
 
-    def total(self, operator: str, column: str | None = None, *,
-              expression: str | None = None, name: str | None = None,
-              label: str | None = None, column_position: str | None = None,
-              format=None) -> Section:
+    def total(
+        self,
+        operator: str,
+        column: str | None = None,
+        *,
+        expression: str | None = None,
+        name: str | None = None,
+        label: str | None = None,
+        column_position: str | None = None,
+        format=None,
+    ) -> Section:
         """Añade un total al corte.
 
         Args:
@@ -58,14 +65,24 @@ class Section:
             La propia sección (fluido).
         """
         self._spec.totals.append(
-            TotalSpec(operator, column, expression, name, label, format, column_position)
+            TotalSpec(
+                operator, column, expression, name, label, format, column_position
+            )
         )
         return self
 
-    def chart(self, kind: str, *, title: str | None = None,
-              operator: str = "sum", column: str | None = None,
-              expression: str | None = None, label_field: str | None = None,
-              options: dict | None = None, source: str | None = None) -> Section:
+    def chart(
+        self,
+        kind: str,
+        *,
+        title: str | None = None,
+        operator: str = "sum",
+        column: str | None = None,
+        expression: str | None = None,
+        label_field: str | None = None,
+        options: dict | None = None,
+        source: str | None = None,
+    ) -> Section:
         """Declara un gráfico dentro del corte.
 
         Args:
@@ -83,15 +100,25 @@ class Section:
             La propia sección (fluido).
         """
         self._spec.charts.append(
-            ChartSpec(kind, title, operator, column, expression, label_field, options, source)
+            ChartSpec(
+                kind, title, operator, column, expression, label_field, options, source
+            )
         )
         return self
 
-    def pivot(self, row_column: str, column_column: str, *,
-              operator: str = "sum", value_column: str | None = None,
-              value_expression: str | None = None, title: str | None = None,
-              show_totals: bool = True, options: dict | None = None,
-              source: str | None = None) -> Section:
+    def pivot(
+        self,
+        row_column: str,
+        column_column: str,
+        *,
+        operator: str = "sum",
+        value_column: str | None = None,
+        value_expression: str | None = None,
+        title: str | None = None,
+        show_totals: bool = True,
+        options: dict | None = None,
+        source: str | None = None,
+    ) -> Section:
         """Declara una matriz de doble entrada (cross-tab).
 
         Args:
@@ -109,13 +136,28 @@ class Section:
             La propia sección (fluido).
         """
         self._spec.pivots.append(
-            PivotSpec(row_column, column_column, operator, value_column,
-                      value_expression, title, show_totals, options, source)
+            PivotSpec(
+                row_column,
+                column_column,
+                operator,
+                value_column,
+                value_expression,
+                title,
+                show_totals,
+                options,
+                source,
+            )
         )
         return self
 
-    def order_by(self, column: str | None = None, *, direction: str = "asc",
-                 total: str | None = None, expression: str | None = None) -> Section:
+    def order_by(
+        self,
+        column: str | None = None,
+        *,
+        direction: str = "asc",
+        total: str | None = None,
+        expression: str | None = None,
+    ) -> Section:
         """Ordena los hijos del corte.
 
         Args:
@@ -149,7 +191,9 @@ class Section:
         self._spec.top_n = n
         return self
 
-    def suppress_zero(self, column: str | None = None, total: str | None = None) -> Section:
+    def suppress_zero(
+        self, column: str | None = None, total: str | None = None
+    ) -> Section:
         """Descarta los hijos con valor cero/None.
 
         Args:

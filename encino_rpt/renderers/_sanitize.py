@@ -11,7 +11,9 @@ _LEADING_TRIM = re.compile(r"^[\s\ufeff]+")
 
 def is_dangerous(value) -> bool:
     """True si Excel/Calc podría tratar `value` como fórmula tras ignorar espacios/BOM iniciales."""
-    return isinstance(value, str) and _LEADING_TRIM.sub("", value).startswith(_DANGEROUS_PREFIXES)
+    return isinstance(value, str) and _LEADING_TRIM.sub("", value).startswith(
+        _DANGEROUS_PREFIXES
+    )
 
 
 def sanitize_csv(value):

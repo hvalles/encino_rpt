@@ -24,7 +24,9 @@ class ExcelRenderer:
         self.styles = styles or {}
         self.formulas = formulas
 
-    def render(self, result, ws=None, styles: dict | None = None, formulas: bool | None = None):
+    def render(
+        self, result, ws=None, styles: dict | None = None, formulas: bool | None = None
+    ):
         """Convierte el resultado a una hoja de Excel.
 
         Args:
@@ -43,7 +45,9 @@ class ExcelRenderer:
             from openpyxl import Workbook
             from openpyxl.styles import Font
         except ImportError as exc:  # pragma: no cover - depende del entorno
-            raise ImportError("openpyxl no está instalado; instala el extra `excel`") from exc
+            raise ImportError(
+                "openpyxl no está instalado; instala el extra `excel`"
+            ) from exc
 
         if ws is None:
             wb = Workbook()
@@ -102,7 +106,11 @@ class ExcelRenderer:
                 for t in node.totals:
                     label = t.label or t.name or t.operator
                     col_idx = self._column_index(t.column)
-                    pos_idx = self._column_index(t.column_position) if t.column_position else col_idx
+                    pos_idx = (
+                        self._column_index(t.column_position)
+                        if t.column_position
+                        else col_idx
+                    )
                     if (
                         self._formulas
                         and t.operator == "sum"
@@ -115,7 +123,9 @@ class ExcelRenderer:
                     else:
                         value = t.value
                         formula = False
-                    fmt = t.format or (self._result.formats.get(t.column) if t.column else None)
+                    fmt = t.format or (
+                        self._result.formats.get(t.column) if t.column else None
+                    )
                     self._total_row(label, value, pos_idx, fmt, formula=formula)
                 if group_stack:
                     group_stack[-1].extend(detail_rows)
@@ -152,8 +162,7 @@ class ExcelRenderer:
             start = prev = r
         parts.append((start, prev))
         refs = [
-            f"{letter}{a}:{letter}{b}" if a != b else f"{letter}{a}"
-            for a, b in parts
+            f"{letter}{a}:{letter}{b}" if a != b else f"{letter}{a}" for a, b in parts
         ]
         return "=SUM(" + ",".join(refs) + ")"
 
@@ -225,11 +234,14 @@ class ExcelRenderer:
         data_end = self._row - 1
         ncols = max(len(node.labels), 1) + 1
 
-        chart_cls = {"pie": PieChart, "bar": BarChart, "line": LineChart}.get(node.kind, BarChart)
+        chart_cls = {"pie": PieChart, "bar": BarChart, "line": LineChart}.get(
+            node.kind, BarChart
+        )
         chart = chart_cls()
         chart.title = node.title or node.kind
-        data = Reference(self._ws, min_col=2, min_row=data_start + 1,
-                         max_col=ncols, max_row=data_end)
+        data = Reference(
+            self._ws, min_col=2, min_row=data_start + 1, max_col=ncols, max_row=data_end
+        )
         chart.add_data(data, titles_from_data=False)
         cats = Reference(self._ws, min_col=2, min_row=data_start, max_col=ncols)
         chart.set_categories(cats)

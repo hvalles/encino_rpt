@@ -11,7 +11,7 @@ class FieldSpec:
     name: str
     expression: str | None = None
     after: str | None = None
-    kind: str = "expr"          # expr | link | image
+    kind: str = "expr"  # expr | link | image
     format: Any = None
     cumulative: str | None = None
     start: Any = 0
@@ -77,7 +77,7 @@ class KpiSpec:
 @dataclass
 class GroupSpec:
     name: str
-    columns: list[str] | None = None      # None -> raíz (una sola partición)
+    columns: list[str] | None = None  # None -> raíz (una sola partición)
     parent: str | None = None
     path: str | None = None
     separator: str = "."

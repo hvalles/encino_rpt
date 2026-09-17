@@ -38,7 +38,9 @@ class PdfRenderer:
                 TableStyle,
             )
         except ImportError as exc:  # pragma: no cover - depende del entorno
-            raise ImportError("reportlab no está instalado; instala el extra `pdf`") from exc
+            raise ImportError(
+                "reportlab no está instalado; instala el extra `pdf`"
+            ) from exc
 
         styles = getSampleStyleSheet()
         self._normal = styles["Normal"]
@@ -50,14 +52,21 @@ class PdfRenderer:
         if result.meta.title:
             story.append(Paragraph(_esc(result.meta.title), styles["Title"]))
         for kpi in result.kpis:
-            story.append(Paragraph(_esc(f"{kpi.label}: {format_value(kpi.value, kpi.format)}"), styles["Normal"]))
+            story.append(
+                Paragraph(
+                    _esc(f"{kpi.label}: {format_value(kpi.value, kpi.format)}"),
+                    styles["Normal"],
+                )
+            )
 
         rows = []
         spans = []
         self._collect(result.root, result, rows, spans)
 
         if result.columns:
-            header = [Paragraph(f"<b>{_esc(c)}</b>", styles["Normal"]) for c in result.columns]
+            header = [
+                Paragraph(f"<b>{_esc(c)}</b>", styles["Normal"]) for c in result.columns
+            ]
         else:
             header = [Paragraph("", styles["Normal"])]
         data = [header] + rows
@@ -84,15 +93,29 @@ class PdfRenderer:
             elif event == "group_end":
                 for t in node.totals:
                     label = t.label or t.name or t.operator
-                    fmt = t.format or (result.formats.get(t.column) if t.column else None)
-                    self._full(f"{label}: {format_value(t.value, fmt)}", rows, spans, ncols)
+                    fmt = t.format or (
+                        result.formats.get(t.column) if t.column else None
+                    )
+                    self._full(
+                        f"{label}: {format_value(t.value, fmt)}", rows, spans, ncols
+                    )
                 if node.footer:
                     self._full(node.footer, rows, spans, ncols)
             elif event == "detail":
-                rows.append([self._cell(node.row.get(c), result.formats.get(c)) for c in result.columns])
+                rows.append(
+                    [
+                        self._cell(node.row.get(c), result.formats.get(c))
+                        for c in result.columns
+                    ]
+                )
             elif event == "chart":
-                summary = "; ".join(f"{s.label or ''}: {', '.join(map(str, s.values))}" for s in node.series)
-                self._full(f"{node.kind} {node.title or ''} — {summary}", rows, spans, ncols)
+                summary = "; ".join(
+                    f"{s.label or ''}: {', '.join(map(str, s.values))}"
+                    for s in node.series
+                )
+                self._full(
+                    f"{node.kind} {node.title or ''} — {summary}", rows, spans, ncols
+                )
             elif event == "pivot":
                 rows.append([self._pivot_table(node)])
                 spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
@@ -118,11 +141,16 @@ class PdfRenderer:
     def _pivot_table(self, node):
         from reportlab.platypus import Paragraph, Table
 
-        head = [Paragraph("", self._normal)] + [Paragraph(f"<b>{_esc(str(c))}</b>", self._normal) for c in node.columns]
+        head = [Paragraph("", self._normal)] + [
+            Paragraph(f"<b>{_esc(str(c))}</b>", self._normal) for c in node.columns
+        ]
         data = [head]
         for i, r in enumerate(node.rows):
             cells = [Paragraph(_esc(str(r)), self._normal)]
-            cells += [Paragraph(_esc("" if v is None else str(v)), self._normal) for v in node.cells[i]]
+            cells += [
+                Paragraph(_esc("" if v is None else str(v)), self._normal)
+                for v in node.cells[i]
+            ]
             data.append(cells)
         return Table(data)
 

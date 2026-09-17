@@ -61,37 +61,62 @@ class HtmlRenderer:
                         parts.append(self._header_row(result))
                     if node.header:
                         cls = "group page-break" if node.page_break else "group"
-                        parts.append(self._full_row(cls, node.header, self._ncols(result)))
+                        parts.append(
+                            self._full_row(cls, node.header, self._ncols(result))
+                        )
             elif event == "group_end":
                 if node.default_collapsed:
                     parts.append("</details>")
                 for t in node.totals:
                     label = t.label or t.name or t.operator
-                    fmt = t.format or (result.formats.get(t.column) if t.column else None)
-                    parts.append(self._full_row("total", f"{label}: {format_value(t.value, fmt)}", self._ncols(result)))
+                    fmt = t.format or (
+                        result.formats.get(t.column) if t.column else None
+                    )
+                    parts.append(
+                        self._full_row(
+                            "total",
+                            f"{label}: {format_value(t.value, fmt)}",
+                            self._ncols(result),
+                        )
+                    )
                 if node.footer:
-                    parts.append(self._full_row("group", node.footer, self._ncols(result)))
+                    parts.append(
+                        self._full_row("group", node.footer, self._ncols(result))
+                    )
             elif event == "detail":
                 cells = []
                 for c in result.columns:
                     value = node.row.get(c)
                     attrs = self._cell_attrs(c, value, result.styles)
-                    cells.append(f"<td{attrs}>{self._cell_content(c, value, result)}</td>")
+                    cells.append(
+                        f"<td{attrs}>{self._cell_content(c, value, result)}</td>"
+                    )
                 parts.append(f"<tr>{''.join(cells)}</tr>")
             elif event == "chart":
                 summary = "; ".join(
-                    f"{s.label or ''}: {', '.join(map(str, s.values))}" for s in node.series
+                    f"{s.label or ''}: {', '.join(map(str, s.values))}"
+                    for s in node.series
                 )
-                parts.append(self._full_row("chart", f"{node.kind} {node.title or ''} — {summary}", self._ncols(result)))
+                parts.append(
+                    self._full_row(
+                        "chart",
+                        f"{node.kind} {node.title or ''} — {summary}",
+                        self._ncols(result),
+                    )
+                )
             elif event == "pivot":
-                parts.append(f'<tr class="pivot"><td colspan="{self._ncols(result)}">{self._pivot(node)}</td></tr>')
+                parts.append(
+                    f'<tr class="pivot"><td colspan="{self._ncols(result)}">{self._pivot(node)}</td></tr>'
+                )
 
     def _pivot(self, node) -> str:
         head = "<th></th>" + "".join(f"<th>{_esc(str(c))}</th>" for c in node.columns)
         rows = [f"<tr>{head}</tr>"]
         for i, r in enumerate(node.rows):
             cells = [f"<td>{_esc(str(r))}</td>"]
-            cells += [f"<td>{'' if v is None else _esc(str(v))}</td>" for v in node.cells[i]]
+            cells += [
+                f"<td>{'' if v is None else _esc(str(v))}</td>" for v in node.cells[i]
+            ]
             rows.append(f"<tr>{''.join(cells)}</tr>")
         return f'<table class="pivot"><tbody>{"".join(rows)}</tbody></table>'
 

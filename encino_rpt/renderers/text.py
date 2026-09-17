@@ -44,7 +44,9 @@ class TextRenderer:
                 indent = "  " * depth
                 for t in node.totals:
                     label = t.label or t.name or t.operator
-                    fmt = t.format or (result.formats.get(t.column) if t.column else None)
+                    fmt = t.format or (
+                        result.formats.get(t.column) if t.column else None
+                    )
                     lines.append(f"{indent}{label}: {format_value(t.value, fmt)}")
                 if node.footer:
                     lines.append(f"{indent}{node.footer}")
@@ -57,10 +59,14 @@ class TextRenderer:
             elif event == "chart":
                 lines.append(f"{'  ' * depth}[chart:{node.kind}] {node.title or ''}")
                 for s in node.series:
-                    lines.append(f"{'  ' * depth}  {s.label or ''}: {', '.join(map(str, s.values))}")
+                    lines.append(
+                        f"{'  ' * depth}  {s.label or ''}: {', '.join(map(str, s.values))}"
+                    )
             elif event == "pivot":
                 lines.append(f"{'  ' * depth}[pivot] {node.title or ''}")
-                lines.append(f"{'  ' * depth}  (cols) {' '.join(map(str, node.columns))}")
+                lines.append(
+                    f"{'  ' * depth}  (cols) {' '.join(map(str, node.columns))}"
+                )
                 for i, row in enumerate(node.rows):
                     cells = " ".join("" if c is None else str(c) for c in node.cells[i])
                     lines.append(f"{'  ' * depth}  {row}: {cells}")
