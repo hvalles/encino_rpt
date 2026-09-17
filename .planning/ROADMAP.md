@@ -42,8 +42,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Precisión de `format_value` (CORR-02) + sanitizer whitespace/BOM (SEC-02)
-- [ ] 01-02-PLAN.md — `order_by` con funciones custom y error de total ausente (CORR-04, CORR-05)
+- [x] 01-01-PLAN.md — Precisión de `format_value` (CORR-02) + sanitizer whitespace/BOM (SEC-02)
+- [x] 01-02-PLAN.md — `order_by` con funciones custom y error de total ausente (CORR-04, CORR-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -148,7 +148,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Quick Wins (Corrección low-risk) | 0/3 | Not started | - |
+| 1. Quick Wins (Corrección low-risk) | 2/3 | In Progress|  |
 | 2. Correctness Crítico | TBD | Not started | - |
 | 3. Robustez | TBD | Not started | - |
 | 4. Seguridad | TBD | Not started | - |
