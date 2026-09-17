@@ -257,7 +257,7 @@ def _build_instance(report, spec, key, rows, sources, registry, deferred, visibl
     _compute_totals_into(report, spec, rows, node, registry, deferred)
 
     # fase C sobre los hijos (grupos/detalle), antes de añadir chart/pivot
-    node.children = _apply_order(spec, node.children)
+    node.children = _apply_order(spec, node.children, report._functions)
 
     # charts y pivots al final
     extras = []
@@ -274,11 +274,11 @@ def _build_instance(report, spec, key, rows, sources, registry, deferred, visibl
     return node, rows
 
 
-def _apply_order(spec, children):
+def _apply_order(spec, children, functions):
     if spec.order_by:
         ob = spec.order_by
         reverse = ob.get("direction") == "desc"
-        children = sorted(children, key=lambda c: _sort_key(c, ob), reverse=reverse)
+        children = sorted(children, key=lambda c: _sort_key(c, ob, functions), reverse=reverse)
     if spec.suppress_zero:
         sz = spec.suppress_zero
         children = [c for c in children if not _is_zero(c, sz)]
@@ -287,7 +287,7 @@ def _apply_order(spec, children):
     return children
 
 
-def _sort_key(child, ob):
+def _sort_key(child, ob, functions):
     total = ob.get("total")
     expression = ob.get("expression")
     column = ob.get("column")
@@ -295,9 +295,10 @@ def _sort_key(child, ob):
         for t in getattr(child, "totals", []):
             if t.name == total:
                 return t.value
-        return None
+        child_desc = getattr(child, "name", None) or getattr(child, "key", None)
+        raise ValueError(f"total de orden inexistente: {total!r} (hijo {child_desc!r})")
     if expression:
-        return evaluate(expression, getattr(child, "_first_row", {}), {})
+        return evaluate(expression, getattr(child, "_first_row", {}), functions)
     if column:
         if isinstance(child, Group):
             return child.key.get(column) if child.key else None
