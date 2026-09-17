@@ -313,3 +313,38 @@ def test_deep_path_renders_iteratively():
     html_out = result.render_html()
     assert "<table>" in html_out
 
+
+# --- regresiones TEST-01 (renderers) ---
+def test_deep_tree_to_json():
+    # regresión documenta bug conocido — ver CONCERNS.md §Performance
+    # (serialización JSON de árboles profundos)
+    n = 1100
+    path = ".".join(str(i) for i in range(n))
+    rows = [{"cuenta": path, "monto": 7}]
+    rep = Report(rows)
+    rep.group("cuentas", path="cuenta")
+    rep.detail("cuenta", "monto")
+    rep.group("global")
+    result = rep.run()
+
+    # pydantic-core lanza ValueError "Circular reference detected (depth exceeded)", no RecursionError
+    with pytest.raises(ValueError):
+        result.to_json()
+
+
+def test_excel_styles_footer_dead_params():
+    pytest.importorskip("openpyxl")
+    # regresión documenta bug conocido — ver CONCERNS.md §Tech Debt
+    # (styles/footer muertos)
+    rows = [{"sku": "A", "monto": 100}]
+    rep = Report(rows)
+    rep.detail("sku", "monto")
+    rep.group("global")
+    rep.section("global").footer("Total", column_position="monto")
+    rep.section("global").total("sum", "monto")
+    result = rep.run()
+
+    # styles y column_position son no-op (sin crash); el footer se renderiza como fila completa
+    ws = result.to_excel(styles={"bold": True})
+    assert "Total" in [c.value for row in ws.iter_rows() for c in row]
+
