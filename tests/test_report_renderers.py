@@ -82,6 +82,27 @@ def test_csv_renderer():
     assert "B,1" in csv_out
 
 
+def test_csv_uses_lf_not_crlf():
+    # regresión: `to_csv()` usa LF. Con CRLF, escribirlo en modo texto
+    # (que traduce `\n` -> `\r\n`) producía `\r\r\n` y líneas en blanco.
+    rows = [{"sku": "A", "cantidad": 2}, {"sku": "B", "cantidad": 1}]
+    rep = Report(rows)
+    rep.detail("sku", "cantidad")
+    out = rep.run().to_csv()
+    assert "\r" not in out
+    assert out == "A,2\nB,1"
+
+
+def test_csv_file_has_no_blank_lines(tmp_path):
+    rows = [{"sku": "A", "cantidad": 2}, {"sku": "B", "cantidad": 1}]
+    rep = Report(rows)
+    rep.detail("sku", "cantidad")
+    path = tmp_path / "out.csv"
+    path.write_text(rep.run().to_csv(), encoding="utf-8")
+    assert b"\r\r\n" not in path.read_bytes()
+    assert path.read_text(encoding="utf-8").splitlines() == ["A,2", "B,1"]
+
+
 def test_html_renderer_and_styles():
     rows = [{"total": -5}, {"total": 10}]
     rep = Report(rows)

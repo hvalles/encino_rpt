@@ -27,7 +27,7 @@ class CsvRenderer:
         Returns:
             El CSV como cadena.
         """
-        return "\r\n".join(self.iter_csv(result))
+        return "\n".join(self.iter_csv(result))
 
     def iter_csv(self, result) -> Iterator[str]:
         """Genera las líneas CSV (sin terminador) del resultado, una por yield.
@@ -50,7 +50,7 @@ class CsvRenderer:
         """
         for i, line in enumerate(self.iter_csv(result)):
             if i:
-                file.write("\r\n")
+                file.write("\n")
             file.write(line)
 
     def _line(self, row) -> str:
