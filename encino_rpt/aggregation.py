@@ -394,9 +394,7 @@ def _build_instance(
             report._functions,
             report._aggregates,
         )
-        extras.append(
-            _wrap(f"pivote (grupo {spec.name!r})", build_pivot, ps, rows, fn)
-        )
+        extras.append(_wrap(f"pivote (grupo {spec.name!r})", build_pivot, ps, rows, fn))
     node.children = node.children + extras
 
     return node, rows

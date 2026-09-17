@@ -192,3 +192,9 @@ El `ReportResult` expone métodos de conveniencia que delegan en los renderers:
 | `model_dump()` | JSON canónico | — |
 
 `to_excel(formulas=True)` emite `=SUM(...)` para totales `sum` en lugar del valor.
+
+`to_json()` (y `model_dump(mode="json")`) serializan el árbol a JSON. Una
+jerarquía demasiado profunda (p. ej. un `path` con miles de niveles) excede el
+límite de recursión de pydantic; en ese caso `to_json()` lanza un `ValueError`
+controlado (no un `RecursionError`) indicando que el reporte es demasiado
+profundo.

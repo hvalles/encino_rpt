@@ -337,6 +337,11 @@ class ReportResult(BaseModel):
 
         Returns:
             La cadena JSON con `schema_version`.
+
+        Raises:
+            ValueError: Si la jerarquía es demasiado profunda para serializar a
+                JSON (p. ej. un `path` con miles de niveles); se lanza un error
+                controlado en lugar de un `RecursionError`.
         """
         from .renderers.json import JsonRenderer
 

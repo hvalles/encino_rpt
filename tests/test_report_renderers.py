@@ -434,8 +434,7 @@ def test_deep_path_renders_iteratively():
 
 # --- regresiones TEST-01 (renderers) ---
 def test_deep_tree_to_json():
-    # regresión documenta bug conocido — ver CONCERNS.md §Performance
-    # (serialización JSON de árboles profundos)
+    # CORR-14: jerarquía demasiado profunda -> ValueError claro, no RecursionError.
     n = 1100
     path = ".".join(str(i) for i in range(n))
     rows = [{"cuenta": path, "monto": 7}]
@@ -445,8 +444,7 @@ def test_deep_tree_to_json():
     rep.group("global")
     result = rep.run()
 
-    # pydantic-core lanza ValueError "Circular reference detected (depth exceeded)", no RecursionError
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="demasiado profunda"):
         result.to_json()
 
 
