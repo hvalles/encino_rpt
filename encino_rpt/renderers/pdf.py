@@ -14,16 +14,20 @@ from ._walk import walk
 class PdfRenderer:
     """Renderiza el `ReportResult` a un PDF (reportlab)."""
 
-    def render(self, result, repeat_header: bool = True, **opts) -> bytes:
+    def render(
+        self, result, repeat_header: bool = True, *, file=None, **opts
+    ) -> bytes | None:
         """Convierte el resultado a PDF.
 
         Args:
             result: El `ReportResult` a renderizar.
             repeat_header: Repetir el encabezado de columnas en cada página.
+            file: Objeto file-like binario (`.write(bytes)`). Si se provee, el PDF
+                se escribe ahí (streaming) y devuelve `None`; si no, devuelve bytes.
             **opts: Opciones adicionales para `SimpleDocTemplate`.
 
         Returns:
-            Los bytes del PDF.
+            Los bytes del PDF, o `None` si se pasó `file`.
 
         Raises:
             ImportError: Si `reportlab` no está instalado.
@@ -46,7 +50,7 @@ class PdfRenderer:
         styles = getSampleStyleSheet()
         self._normal = styles["Normal"]
 
-        buf = io.BytesIO()
+        buf = file if file is not None else io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=A4, **opts)
         story = []
 
@@ -83,6 +87,8 @@ class PdfRenderer:
         story.append(table)
 
         doc.build(story)
+        if file is not None:
+            return None
         return buf.getvalue()
 
     def _collect(self, root, result, rows, spans):

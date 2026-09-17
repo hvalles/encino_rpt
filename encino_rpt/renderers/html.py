@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html as _html
 import re as _re
+from collections.abc import Iterator
 
 from ..models import Image, Link
 from ._format import format_value
@@ -51,64 +52,79 @@ class HtmlRenderer:
             completo (`<!DOCTYPE html>`, `<head>`, `<body class="report">`); el
             bloque `<style>` (si `css=True`) va dentro de `<head>`.
         """
-        parts = ["<table>"]
+        return "".join(self.iter_html(result))
+
+    def iter_html(self, result) -> Iterator[str]:
+        """Genera los fragmentos HTML del resultado, uno por yield (streaming).
+
+        Args:
+            result: El `ReportResult` a renderizar.
+
+        Yields:
+            Fragmentos HTML cuya concatenación equivale a `render()`.
+        """
+        if self.template:
+            yield "<!DOCTYPE html><html><head>"
+            yield '<meta charset="utf-8">'
+            yield f"<title>{_esc(self.title or result.meta.title or '')}</title>"
+            if self.css:
+                yield _style_block(result)
+            yield '</head><body class="report">'
+        elif self.css:
+            yield _style_block(result)
+        yield from self._table_chunks(result)
+        if self.template:
+            yield "</body></html>"
+
+    def write(self, result, file) -> None:
+        """Escribe el HTML a un objeto file-like (streaming, fragmento por fragmento).
+
+        Args:
+            result: El `ReportResult` a renderizar.
+            file: Objeto file-like con `write(str)`.
+        """
+        for chunk in self.iter_html(result):
+            file.write(chunk)
+
+    def _table_chunks(self, result) -> Iterator[str]:
+        yield "<table>"
         if result.columns:
             header = "".join(f"<th>{_esc(c)}</th>" for c in result.columns)
-            parts.append(f"<thead><tr>{header}</tr></thead>")
-        parts.append("<tbody>")
-        self._walk(result.root, result, parts)
-        parts.append("</tbody></table>")
-        table = "".join(parts)
-
-        if not self.template:
-            style_block = _style_block(result) if self.css else ""
-            return style_block + table
-
-        title = _esc(self.title or result.meta.title or "")
-        style_block = _style_block(result) if self.css else ""
-        head = f'<meta charset="utf-8"><title>{title}</title>{style_block}'
-        return (
-            "<!DOCTYPE html><html><head>"
-            + head
-            + f'</head><body class="report">{table}</body></html>'
-        )
+            yield f"<thead><tr>{header}</tr></thead>"
+        yield "<tbody>"
+        yield from self._walk_chunks(result.root, result)
+        yield "</tbody></table>"
 
     def _ncols(self, result) -> int:
         return len(result.columns) or 1
 
-    def _walk(self, root, result, parts):
+    def _walk_chunks(self, root, result) -> Iterator[str]:
         for event, node in walk(root):
             if event == "group_start":
                 if node.default_collapsed:
-                    parts.append("<details>")
-                    parts.append(f"<summary>{_esc(node.header or '')}</summary>")
+                    yield "<details>"
+                    yield f"<summary>{_esc(node.header or '')}</summary>"
                 else:
                     if self.repeat_header and node.header and result.columns:
-                        parts.append(self._header_row(result))
+                        yield self._header_row(result)
                     if node.header:
                         cls = "group page-break" if node.page_break else "group"
-                        parts.append(
-                            self._full_row(cls, node.header, self._ncols(result))
-                        )
+                        yield self._full_row(cls, node.header, self._ncols(result))
             elif event == "group_end":
                 if node.default_collapsed:
-                    parts.append("</details>")
+                    yield "</details>"
                 for t in node.totals:
                     label = t.label or t.name or t.operator
                     fmt = t.format or (
                         result.formats.get(t.column) if t.column else None
                     )
-                    parts.append(
-                        self._full_row(
-                            "total",
-                            f"{label}: {format_value(t.value, fmt)}",
-                            self._ncols(result),
-                        )
+                    yield self._full_row(
+                        "total",
+                        f"{label}: {format_value(t.value, fmt)}",
+                        self._ncols(result),
                     )
                 if node.footer:
-                    parts.append(
-                        self._full_row("group", node.footer, self._ncols(result))
-                    )
+                    yield self._full_row("group", node.footer, self._ncols(result))
             elif event == "detail":
                 cells = []
                 for c in result.columns:
@@ -117,22 +133,21 @@ class HtmlRenderer:
                     cells.append(
                         f"<td{attrs}>{self._cell_content(c, value, result)}</td>"
                     )
-                parts.append(f"<tr>{''.join(cells)}</tr>")
+                yield f"<tr>{''.join(cells)}</tr>"
             elif event == "chart":
                 summary = "; ".join(
                     f"{s.label or ''}: {', '.join(map(str, s.values))}"
                     for s in node.series
                 )
-                parts.append(
-                    self._full_row(
-                        "chart",
-                        f"{node.kind} {node.title or ''} — {summary}",
-                        self._ncols(result),
-                    )
+                yield self._full_row(
+                    "chart",
+                    f"{node.kind} {node.title or ''} — {summary}",
+                    self._ncols(result),
                 )
             elif event == "pivot":
-                parts.append(
-                    f'<tr class="pivot"><td colspan="{self._ncols(result)}">{self._pivot(node)}</td></tr>'
+                yield (
+                    f'<tr class="pivot"><td colspan="{self._ncols(result)}">'
+                    f"{self._pivot(node)}</td></tr>"
                 )
 
     def _pivot(self, node) -> str:

@@ -465,3 +465,51 @@ def test_excel_styles_footer_dead_params():
     # styles y column_position son no-op (sin crash); el footer se renderiza como fila completa
     ws = result.to_excel(styles={"bold": True})
     assert "Total" in [c.value for row in ws.iter_rows() for c in row]
+
+
+def _streaming_report():
+    rows = [{"sku": "A", "cantidad": 2}, {"sku": "B", "cantidad": 1}]
+    rep = Report(rows)
+    rep.detail("sku", "cantidad")
+    rep.group("global")
+    rep.section("global").total("sum", "cantidad")
+    return rep.run()
+
+
+def test_iter_csv_matches_render():
+    result = _streaming_report()
+    assert list(result.iter_csv()) == result.to_csv().splitlines()
+
+
+def test_to_csv_file_writes():
+    import io
+
+    result = _streaming_report()
+    buf = io.StringIO()
+    assert result.to_csv(file=buf) is None
+    assert buf.getvalue() == result.to_csv()
+
+
+def test_iter_text_matches_render():
+    result = _streaming_report()
+    assert list(result.iter_text()) == result.to_text().splitlines()
+
+
+def test_iter_html_matches_render():
+    result = _streaming_report()
+    assert "".join(result.iter_html()) == result.render_html()
+
+
+def test_iter_markdown_matches_render():
+    result = _streaming_report()
+    assert "\n".join(result.iter_markdown()) == result.to_markdown()
+
+
+def test_to_pdf_file_writes():
+    pytest.importorskip("reportlab")
+    import io
+
+    result = _streaming_report()
+    buf = io.BytesIO()
+    assert result.to_pdf(file=buf) is None
+    assert buf.getvalue().startswith(b"%PDF")

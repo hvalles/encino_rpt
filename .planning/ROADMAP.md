@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 9: Readers multi-formato** - Protocolo `Reader` + registro; readers stdlib (csv/tsv/json/jsonl/tuples) y `excel`; auto-detección de tipos (completed 2026-09-17)
 - [x] **Phase 10: Templates HTML + Markdown** - HTML por clases (sin CSS inline), template de documento, `MarkdownRenderer` + `to_markdown()` (completed 2026-09-17)
-- *(diferido)* **Streaming de salida** - `to_csv(file=...)`/iteradores (entrada descartada, no-objetivo)
+- [x] **Streaming de salida** - `iter_csv`/`iter_text`/`iter_html`/`iter_markdown` + `file=` (entrada descartada, no-objetivo) *(completado 2026-09-17, directo)*
 
 ## Phase Details
 

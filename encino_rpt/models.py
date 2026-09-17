@@ -155,7 +155,8 @@ class ReportResult(BaseModel):
         css: bool = False,
         template: bool = False,
         title: str | None = None,
-    ) -> str:
+        file=None,
+    ) -> str | None:
         """Renderiza el reporte a una tabla HTML (o documento completo).
 
         Args:
@@ -168,44 +169,119 @@ class ReportResult(BaseModel):
                 (`<!DOCTYPE html>`, `<head>`, `<body class="report">`). El bloque
                 `<style>` (si `css`) va dentro de `<head>`.
             title: Título del documento (`<title>`); por defecto usa `meta.title`.
+            file: Objeto file-like con `write(str)`; si se provee, el HTML se
+                escribe ahí (streaming) y devuelve `None`.
 
         Returns:
-            El HTML como cadena.
+            El HTML como cadena, o `None` si se pasó `file`.
         """
         from .renderers.html import HtmlRenderer
 
-        return HtmlRenderer(
+        renderer = HtmlRenderer(
             classes=classes,
             repeat_header=repeat_header,
             css=css,
             template=template,
             title=title,
-        ).render(self)
+        )
+        if file is None:
+            return renderer.render(self)
+        renderer.write(self, file)
+        return None
 
-    def to_csv(self, delimiter: str = ",") -> str:
+    def iter_html(
+        self,
+        classes: dict | None = None,
+        repeat_header: bool = False,
+        *,
+        css: bool = False,
+        template: bool = False,
+        title: str | None = None,
+    ):
+        """Genera los fragmentos HTML del reporte (streaming).
+
+        Args:
+            classes: Mapa de clases CSS por tipo de fila.
+            repeat_header: Repetir el encabezado de columnas por grupo.
+            css: Formato condicional como clases + `<style>` (opt-in).
+            template: Envolver en documento HTML completo.
+            title: Título del documento.
+
+        Yields:
+            Fragmentos HTML cuya concatenación equivale a `render_html()`.
+        """
+        from .renderers.html import HtmlRenderer
+
+        renderer = HtmlRenderer(
+            classes=classes,
+            repeat_header=repeat_header,
+            css=css,
+            template=template,
+            title=title,
+        )
+        yield from renderer.iter_html(self)
+
+    def to_csv(self, delimiter: str = ",", *, file=None) -> str | None:
         """Renderiza el reporte a CSV (aplanado).
 
         Args:
             delimiter: Delimitador de campos.
+            file: Objeto file-like con `write(str)`; si se provee, el CSV se
+                escribe ahí (streaming) y devuelve `None`.
 
         Returns:
-            El CSV como cadena.
+            El CSV como cadena, o `None` si se pasó `file`.
         """
         from .renderers.csv import CsvRenderer
 
-        return CsvRenderer(delimiter=delimiter).render(self)
+        renderer = CsvRenderer(delimiter=delimiter)
+        if file is None:
+            return renderer.render(self)
+        renderer.write(self, file)
+        return None
 
-    def to_text(self) -> str:
+    def iter_csv(self, delimiter: str = ","):
+        """Genera las líneas CSV del reporte (streaming).
+
+        Args:
+            delimiter: Delimitador de campos.
+
+        Yields:
+            Cada línea CSV como `str` (sin terminador de línea).
+        """
+        from .renderers.csv import CsvRenderer
+
+        yield from CsvRenderer(delimiter=delimiter).iter_csv(self)
+
+    def to_text(self, *, file=None) -> str | None:
         """Renderiza el reporte a texto plano (para inspección).
 
+        Args:
+            file: Objeto file-like con `write(str)`; si se provee, el texto se
+                escribe ahí (streaming) y devuelve `None`.
+
         Returns:
-            El texto como cadena.
+            El texto como cadena, o `None` si se pasó `file`.
         """
         from .renderers.text import TextRenderer
 
-        return TextRenderer().render(self)
+        renderer = TextRenderer()
+        if file is None:
+            return renderer.render(self)
+        renderer.write(self, file)
+        return None
 
-    def to_markdown(self) -> str:
+    def iter_text(self):
+        """Genera las líneas de texto del reporte (streaming).
+
+        Yields:
+            Cada línea de texto como `str`.
+        """
+        from .renderers.text import TextRenderer
+
+        yield from TextRenderer().iter_text(self)
+
+    def to_markdown(self, *, file=None) -> str | None:
         """Renderiza el reporte a Markdown (tablas GFM, grupos como encabezados).
 
         Fidelidad limitada: sin formato condicional ni gráficos — los `Chart`
@@ -213,12 +289,30 @@ class ReportResult(BaseModel):
         filas×columnas. Los enlaces/imágenes se emiten como `[label](href)` /
         `![alt](src)`.
 
+        Args:
+            file: Objeto file-like con `write(str)`; si se provee, el Markdown se
+                escribe ahí (streaming) y devuelve `None`.
+
         Returns:
-            El Markdown como cadena.
+            El Markdown como cadena, o `None` si se pasó `file`.
         """
         from .renderers.markdown import MarkdownRenderer
 
-        return MarkdownRenderer().render(self)
+        renderer = MarkdownRenderer()
+        if file is None:
+            return renderer.render(self)
+        renderer.write(self, file)
+        return None
+
+    def iter_markdown(self):
+        """Genera las líneas Markdown del reporte (streaming).
+
+        Yields:
+            Cada línea Markdown como `str`.
+        """
+        from .renderers.markdown import MarkdownRenderer
+
+        yield from MarkdownRenderer().iter_markdown(self)
 
     def to_excel(self, ws=None, styles: dict | None = None, formulas: bool = False):
         """Renderiza el reporte a una hoja de Excel (openpyxl).
@@ -248,19 +342,23 @@ class ReportResult(BaseModel):
 
         return JsonRenderer().render(self, indent=indent)
 
-    def to_pdf(self, *, repeat_header: bool = True, **opts) -> bytes:
+    def to_pdf(self, *, repeat_header: bool = True, file=None, **opts) -> bytes | None:
         """Renderiza el reporte a PDF (reportlab).
 
         Args:
             repeat_header: Repetir el encabezado de columnas en cada página.
+            file: Objeto file-like binario (`.write(bytes)`); si se provee, el PDF
+                se escribe ahí (streaming) y devuelve `None`.
             **opts: Opciones adicionales para `SimpleDocTemplate`.
 
         Returns:
-            Los bytes del PDF.
+            Los bytes del PDF, o `None` si se pasó `file`.
         """
         from .renderers.pdf import PdfRenderer
 
-        return PdfRenderer().render(self, repeat_header=repeat_header, **opts)
+        return PdfRenderer().render(
+            self, repeat_header=repeat_header, file=file, **opts
+        )
 
 
 Group.model_rebuild()

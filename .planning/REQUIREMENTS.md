@@ -73,7 +73,7 @@ Milestone v1.1: Readers multi-formato + Templates HTML/Markdown.
 
 ### Streaming (diferido)
 
-- **STRM-01** *(diferido)*: salida en streaming (`to_csv(file=...)`/iteradores). Entrada en streaming descartada (no-objetivo).
+- [x] **STRM-01**: salida en streaming (`iter_csv`/`iter_text`/`iter_html`/`iter_markdown` + `file=` en `to_csv`/`to_text`/`to_markdown`/`render_html`/`to_pdf`). Entrada en streaming descartada (no-objetivo).
 
 ## v2 Requirements
 

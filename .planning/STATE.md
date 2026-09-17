@@ -83,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase 09]: `Reader` como `typing.Protocol` (no ABC); `coerce` aplica solo a texto delimitado (csv/tsv) — json/jsonl/tuples/excel preservan tipos ya tipados para no corromper IDs tipo `"001"`.
 - [Phase 10]: modo clases HTML opt-in (`css=False` por defecto, byte-idéntico al inline); el CSS del bloque `<style>` reutiliza `_SAFE_PROP`/`_UNSAFE_VALUE`/`_esc` (sin superficie de inyección nueva).
 - [Phase 10]: `MarkdownRenderer` consume `walk()`; `_md_cell` escapa valores planos y emite links/imágenes nativos, `_md_table` escapa solo headers (evita doble-escape de `|`); wrapper de documento estructural (nunca Jinja2).
+- [v1.1 Streaming]: SQLite temp-table descartado (pre-agregación fuera de alcance: rompe funciones custom, contradice el no-objetivo SQL y no resuelve la memoria de salida); streaming de ENTRADA = no-objetivo definitivo; streaming de SALIDA implementado (iter_csv/iter_text/iter_html/iter_markdown + `file=`), manteniendo el path `to_*` sin `file=` byte-idéntico.
 
 ### Pending Todos
 

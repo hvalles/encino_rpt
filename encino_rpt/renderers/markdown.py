@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from ..models import Image, Link
 from ._format import format_value
 from ._walk import walk
@@ -59,21 +61,42 @@ class MarkdownRenderer:
         Returns:
             El Markdown como cadena.
         """
-        lines: list[str] = []
+        return "\n".join(self.iter_markdown(result))
+
+    def iter_markdown(self, result) -> Iterator[str]:
+        """Genera las líneas Markdown del resultado, una por yield.
+
+        Args:
+            result: El `ReportResult` a renderizar.
+
+        Yields:
+            Cada línea Markdown como `str`.
+        """
         for kpi in result.kpis:
             label = kpi.label or ""
-            lines.append(f"**{label}:** {format_value(kpi.value, kpi.format)}")
-        self._walk(result.root, result, lines)
-        return "\n".join(lines)
+            yield f"**{label}:** {format_value(kpi.value, kpi.format)}"
+        yield from self._walk_lines(result.root, result)
 
-    def _flush_pending(self, pending, result, lines):
+    def write(self, result, file) -> None:
+        """Escribe el Markdown a un objeto file-like (streaming, línea por línea).
+
+        Args:
+            result: El `ReportResult` a renderizar.
+            file: Objeto file-like con `write(str)`.
+        """
+        for i, line in enumerate(self.iter_markdown(result)):
+            if i:
+                file.write("\n")
+            file.write(line)
+
+    def _flush_pending(self, pending, result) -> Iterator[str]:
         if not pending:
             return
         rows = [
             [_md_cell(row.get(c), result.formats.get(c)) for c in result.columns]
             for row in pending
         ]
-        lines.append(_md_table(result.columns, rows))
+        yield _md_table(result.columns, rows)
         pending.clear()
 
     def _pivot_table(self, node) -> str:
@@ -86,40 +109,40 @@ class MarkdownRenderer:
             rows.append(cells)
         return _md_table(headers, rows)
 
-    def _walk(self, root, result, lines):
+    def _walk_lines(self, root, result) -> Iterator[str]:
         depth = 0
         pending: list[dict] = []
         for event, node in walk(root):
             if event == "group_start":
-                self._flush_pending(pending, result, lines)
+                yield from self._flush_pending(pending, result)
                 if node.header:
-                    lines.append(f"{'#' * (depth + 2)} {node.header}")
+                    yield f"{'#' * (depth + 2)} {node.header}"
                 depth += 1
             elif event == "group_end":
                 depth -= 1
-                self._flush_pending(pending, result, lines)
+                yield from self._flush_pending(pending, result)
                 indent = "  " * depth
                 for t in node.totals:
                     label = t.label or t.name or t.operator
                     fmt = t.format or (
                         result.formats.get(t.column) if t.column else None
                     )
-                    lines.append(f"{indent}**{label}:** {format_value(t.value, fmt)}")
+                    yield f"{indent}**{label}:** {format_value(t.value, fmt)}"
                 if node.footer:
-                    lines.append(f"{indent}{node.footer}")
+                    yield f"{indent}{node.footer}"
             elif event == "detail":
                 pending.append(node.row)
             elif event == "chart":
-                self._flush_pending(pending, result, lines)
+                yield from self._flush_pending(pending, result)
                 if not node.series:
-                    lines.append(f"**{node.title or ''}** ({node.kind})")
+                    yield f"**{node.title or ''}** ({node.kind})"
                 else:
                     for s in node.series:
                         values = ", ".join(map(str, s.values))
-                        lines.append(
+                        yield (
                             f"**{node.title or ''}** ({node.kind}): "
                             f"{s.label or ''}: {values}"
                         )
             elif event == "pivot":
-                self._flush_pending(pending, result, lines)
-                lines.append(self._pivot_table(node))
+                yield from self._flush_pending(pending, result)
+                yield self._pivot_table(node)
