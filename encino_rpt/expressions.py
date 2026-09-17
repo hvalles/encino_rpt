@@ -57,7 +57,7 @@ def evaluate(expr: str, row: dict, functions: dict | None = None) -> Any:
     merged = {**_FUNCTIONS, **(functions or {})}
     try:
         tree = ast.parse(expr, mode="eval")
-    except (RecursionError, MemoryError, SyntaxError) as exc:
+    except (RecursionError, MemoryError, SyntaxError, ValueError) as exc:
         raise ExpressionError("expresión no válida o demasiado profunda") from exc
     if sum(1 for _ in ast.walk(tree)) > _MAX_NODES:
         raise ExpressionError("expresión demasiado compleja")

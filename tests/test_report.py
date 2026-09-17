@@ -560,3 +560,25 @@ def test_chart_pivot_error_context():
 
     with pytest.raises(AggregationError, match="gráfico"):
         rep.run()
+
+
+def test_aggregate_operators():
+    rows = [{"a": "x", "v": 1}, {"a": "x", "v": None}, {"a": "y", "v": 3}]
+    rep = Report(rows)
+    rep.detail("a", "v")
+    rep.group("global")
+    sec = rep.section("global")
+    sec.total("count", "v")
+    sec.total("count_distinct", "v")
+    sec.total("max", "v")
+    sec.total("min", "v")
+    rep.add_aggregate("n", lambda rows, col: len(rows))
+    sec.total("custom:n", "v")
+    result = rep.run()
+
+    totals = {t.operator: t.value for t in result.root.totals}
+    assert totals["count"] == 2  # 1 y 3 (None excluido)
+    assert totals["count_distinct"] == 2  # {1, 3}
+    assert totals["max"] == 3
+    assert totals["min"] == 1
+    assert totals["custom:n"] == 3  # len(rows)

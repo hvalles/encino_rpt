@@ -36,6 +36,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 12: Retirar pydantic** - modelos como `dataclasses` stdlib, `to_dict`/`from_dict` propios, sin dependencias runtime (completed 2026-09-17)
 
+### Milestone v1.4 — Production readiness
+
+- [x] **Phase 13: Production readiness** - null byte uniforme, guard `RecursionError`, validación `_serialize`/`Literal`, tests chart/pivot + operadores + serialización (completed 2026-09-17)
+
 ## Phase Details
 
 ### Phase 1: Quick Wins (Corrección low-risk)

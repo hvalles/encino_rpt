@@ -4,14 +4,9 @@ from __future__ import annotations
 
 import json
 
-from .._serialize import to_jsonable
+from .._serialize import DEPTH_ERROR, to_jsonable
 
 SCHEMA_VERSION = "1.0"
-
-_DEPTH_ERROR = (
-    "la jerarquía es demasiado profunda para serializar a JSON; "
-    "considera un reporte más plano"
-)
 
 
 class JsonRenderer:
@@ -34,19 +29,14 @@ class JsonRenderer:
         try:
             return json.dumps(self.to_dict(result), ensure_ascii=False, indent=indent)
         except RecursionError as exc:
-            raise ValueError(_DEPTH_ERROR) from exc
+            raise ValueError(DEPTH_ERROR) from exc
 
     def to_dict(self, result) -> dict:
         """Devuelve el dict canónico con `schema_version` (tipos JSON nativos).
 
         Raises:
             ValueError: Si la jerarquía es demasiado profunda para serializar a
-                JSON (la serialización recursiva excede el límite de profundidad
-                y en vez de exponer un `RecursionError` se lanza un error
-                controlado).
+                JSON (error controlado en vez de un `RecursionError`).
         """
-        try:
-            data = to_jsonable(result)
-        except RecursionError as exc:
-            raise ValueError(_DEPTH_ERROR) from exc
+        data = to_jsonable(result)
         return {"schema_version": SCHEMA_VERSION, **data}

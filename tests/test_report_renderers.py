@@ -578,3 +578,129 @@ def test_add_style_invalid_when_raises():
     rep = Report([{"a": 1}])
     with pytest.raises(ValueError, match="when"):
         rep.add_style("a", when="bogus", color="red")
+
+
+# --- PRD (production readiness) ---
+def _chart_pivot_report():
+    rows = [
+        {"agente": "Ana", "sku": "A", "monto": 100},
+        {"agente": "Ana", "sku": "B", "monto": 50},
+        {"agente": "Bob", "sku": "A", "monto": 200},
+    ]
+    rep = Report(rows)
+    rep.detail("sku", "agente", "monto")
+    rep.group("por_agente", columns="agente")
+    sec = rep.section("por_agente")
+    sec.total("sum", "monto")
+    sec.chart("pie", title="Ventas", operator="sum", column="monto", label_field="sku")
+    sec.pivot("sku", "agente", operator="sum", value_column="monto")
+    rep.group("global")
+    rep.section("global").total("sum", "monto")
+    return rep.run()
+
+
+def test_chart_pivot_render_html():
+    html = _chart_pivot_report().render_html()
+    assert "Ventas" in html
+    assert 'class="pivot"' in html
+
+
+def test_chart_pivot_render_csv():
+    out = _chart_pivot_report().to_csv()
+    assert "chart:pie" in out
+
+
+def test_chart_pivot_render_text():
+    out = _chart_pivot_report().to_text()
+    assert "[chart:pie]" in out
+    assert "[pivot]" in out
+
+
+def test_chart_pivot_render_markdown():
+    out = _chart_pivot_report().to_markdown()
+    assert "Ventas" in out
+    assert "(pie)" in out
+
+
+def test_chart_pivot_render_excel():
+    pytest.importorskip("openpyxl")
+    ws = _chart_pivot_report().to_excel()
+    vals = [c.value for row in ws.iter_rows() for c in row]
+    assert "pie Ventas" in vals
+    assert "pivot" in vals
+
+
+def test_chart_pivot_render_pdf():
+    pytest.importorskip("reportlab")
+    data = _chart_pivot_report().to_pdf()
+    assert data.startswith(b"%PDF")
+
+
+def test_deep_tree_to_dict_raises_clear():
+    from encino_rpt import ReportResult
+
+    n = 1100
+    path = ".".join(str(i) for i in range(n))
+    rows = [{"cuenta": path, "monto": 7}]
+    rep = Report(rows)
+    rep.group("cuentas", path="cuenta")
+    rep.detail("cuenta", "monto")
+    rep.group("global")
+    result = rep.run()
+    with pytest.raises(ValueError, match="demasiado profunda"):
+        result.to_dict()
+    with pytest.raises(ValueError, match="demasiado profunda"):
+        ReportResult.from_dict(result.to_dict() if False else _deep_dict(n))
+
+
+def _deep_dict(n):
+    node = {"type": "detail", "row": {"x": 1}}
+    for _ in range(n):
+        node = {"type": "group", "name": "g", "children": [node]}
+    return {"root": node}
+
+
+def test_from_dict_rejects_unknown_node():
+    from encino_rpt import ReportResult
+
+    with pytest.raises(ValueError, match="nodo hijo inválido"):
+        ReportResult.from_dict(
+            {"root": {"type": "group", "name": "g", "children": [42]}}
+        )
+    with pytest.raises(ValueError, match="tipo de nodo"):
+        ReportResult.from_dict(
+            {"root": {"type": "group", "name": "g", "children": [{"type": "bogus"}]}}
+        )
+
+
+def test_model_literal_validation():
+    from encino_rpt.models import Chart, ConditionalRule, Format, Link
+
+    with pytest.raises(ValueError, match="kind"):
+        Format(kind="bogus")
+    with pytest.raises(ValueError, match="when"):
+        ConditionalRule(when="bogus")
+    with pytest.raises(ValueError, match="kind de gráfico"):
+        Chart(kind="bogus")
+    with pytest.raises(ValueError, match="target"):
+        Link(target="bogus", href="/x")
+
+
+def test_serialization_decimal_datetime():
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from encino_rpt import ReportResult
+
+    rows = [
+        {"monto": Decimal("100.50"), "fecha": datetime(2024, 1, 2, tzinfo=timezone.utc)}
+    ]
+    rep = Report(rows)
+    rep.detail("monto", "fecha")
+    result = rep.run()
+
+    d = result.to_dict()
+    row = d["root"]["children"][0]["row"]
+    assert row["monto"] == "100.50"
+    assert row["fecha"] == "2024-01-02T00:00:00+00:00"
+    assert ReportResult.from_dict(d).to_dict() == d

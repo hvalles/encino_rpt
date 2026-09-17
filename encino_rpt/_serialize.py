@@ -13,6 +13,11 @@ from .models import Chart, Detail, Group, Pivot, ReportResult
 
 _UNION = (Union, types.UnionType)
 
+DEPTH_ERROR = (
+    "la jerarquía es demasiado profunda para serializar a JSON; "
+    "considera un reporte más plano"
+)
+
 # Dispatch por el discriminador `type` en la unión recursiva de `Group.children`.
 _NODES = {
     "group": Group,
@@ -30,14 +35,25 @@ def to_jsonable(obj: Any) -> Any:
 
     Returns:
         El equivalente JSON-nativo (`dict`/`list`/`str`/`int`/`float`/`bool`/`None`).
+
+    Raises:
+        ValueError: Si la jerarquía es demasiado profunda (en vez de un
+            `RecursionError` crudo).
     """
+    try:
+        return _to_jsonable(obj)
+    except RecursionError as exc:
+        raise ValueError(DEPTH_ERROR) from exc
+
+
+def _to_jsonable(obj: Any) -> Any:
     if isinstance(obj, dict):
-        return {k: to_jsonable(v) for k, v in obj.items()}
+        return {k: _to_jsonable(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [to_jsonable(x) for x in obj]
+        return [_to_jsonable(x) for x in obj]
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         return {
-            f.name: to_jsonable(getattr(obj, f.name))
+            f.name: _to_jsonable(getattr(obj, f.name))
             for f in dataclasses.fields(obj)
             if not f.name.startswith("_")
         }
@@ -68,19 +84,20 @@ def _coerce(value: Any, annotation: Any) -> Any:
     origin = get_origin(annotation)
     if origin in _UNION:
         non_none = [a for a in get_args(annotation) if a is not type(None)]
-        if isinstance(value, dict):
+        if any(a in _NODES.values() for a in non_none):
+            # unión de nodos (Group.children): dispatch estricto por `type`.
+            if not isinstance(value, dict):
+                raise ValueError(f"nodo hijo inválido (se esperaba un dict): {value!r}")
             type_value = value.get("type")
-            if isinstance(type_value, str):
-                node_cls = _NODES.get(type_value)
-                if node_cls is not None and node_cls in non_none:
-                    return _build(node_cls, value)
-            dataclass_candidates = [
-                a
-                for a in non_none
-                if isinstance(a, type) and dataclasses.is_dataclass(a)
-            ]
-            if len(dataclass_candidates) == 1:
-                return _build(dataclass_candidates[0], value)
+            node_cls = _NODES.get(type_value) if isinstance(type_value, str) else None
+            if node_cls is None or node_cls not in non_none:
+                raise ValueError(f"tipo de nodo desconocido: {type_value!r}")
+            return _build(node_cls, value)
+        dataclass_candidates = [
+            a for a in non_none if isinstance(a, type) and dataclasses.is_dataclass(a)
+        ]
+        if len(dataclass_candidates) == 1 and isinstance(value, dict):
+            return _build(dataclass_candidates[0], value)
         return value
     if origin is list:
         item_t = (get_args(annotation) or (Any,))[0]
@@ -101,5 +118,12 @@ def from_dict(data: dict) -> ReportResult:
 
     Returns:
         El `ReportResult` reconstruido.
+
+    Raises:
+        ValueError: Si el dict contiene nodos malformados (tipo de nodo
+            desconocido) o si la jerarquía es demasiado profunda.
     """
-    return _build(ReportResult, data)
+    try:
+        return _build(ReportResult, data)
+    except RecursionError as exc:
+        raise ValueError(DEPTH_ERROR) from exc

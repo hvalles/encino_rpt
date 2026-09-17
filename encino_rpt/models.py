@@ -16,6 +16,10 @@ class Link:
     label: str | None = None
     params: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self):
+        if self.target not in ("section", "report", "page", "external"):
+            raise ValueError(f"target inválido: {self.target!r}")
+
 
 @dataclass
 class Image:
@@ -40,6 +44,14 @@ class Format:
     negative: Literal["minus", "paren"] = "minus"
     percent_scale: bool = False  # percent: multiplica por 100 al mostrar
     pattern: str | None = None  # kind="date": patrón strftime
+
+    def __post_init__(self):
+        if self.kind not in ("number", "currency", "percent", "date"):
+            raise ValueError(f"kind inválido: {self.kind!r}")
+        if self.symbol_position not in ("prefix", "suffix"):
+            raise ValueError(f"symbol_position inválido: {self.symbol_position!r}")
+        if self.negative not in ("minus", "paren"):
+            raise ValueError(f"negative inválido: {self.negative!r}")
 
 
 @dataclass
@@ -81,6 +93,10 @@ class Chart:
     series: list[Series] = field(default_factory=list)
     options: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self):
+        if self.kind not in ("pie", "bar", "line"):
+            raise ValueError(f"kind de gráfico inválido: {self.kind!r}")
+
 
 @dataclass
 class Pivot:
@@ -104,6 +120,10 @@ class ConditionalRule:
     when: Literal["lt", "le", "gt", "ge", "eq", "ne"] = "lt"
     value: Any = 0
     style: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.when not in ("lt", "le", "gt", "ge", "eq", "ne"):
+            raise ValueError(f"when inválido: {self.when!r}")
 
 
 @dataclass

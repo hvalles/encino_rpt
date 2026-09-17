@@ -97,6 +97,16 @@ Milestone v1.3: Retirar pydantic (distribución ligera, stdlib puro).
 - [x] **MIG-04**: `pydantic` eliminado de `pyproject.toml` (deps + plugin `pydantic.mypy`); `uv.lock` sincronizado.
 - [x] **MIG-05**: suite + mypy + ruff verdes; round-trip validado; `from_dict`/`from_json` exportados.
 
+## v1.4 Requirements
+
+Milestone v1.4: Production readiness.
+
+- [x] **PRD-01**: `evaluate` envuelve `ValueError` de `ast.parse` (null byte) como `ExpressionError` uniforme en 3.10–3.13.
+- [x] **PRD-02**: `to_dict`/`from_dict` lanzan `ValueError` claro (no `RecursionError`) en jerarquías profundas.
+- [x] **PRD-03**: `_serialize._coerce` rechaza nodos malformados (`tipo` desconocido / hijo no-dict) con `ValueError`.
+- [x] **PRD-04**: `__post_init__` valida `Literal` en `Link`/`Format`/`Chart`/`ConditionalRule`.
+- [x] **PRD-05**: tests de render chart/pivot en los 6 formatos + operadores de agregado + round-trip `Decimal`/`datetime`.
+
 ## v2 Requirements
 
 Deferred. No en el roadmap actual.
@@ -161,6 +171,11 @@ Deferred. No en el roadmap actual.
 | MIG-03 | Phase 12 | Complete |
 | MIG-04 | Phase 12 | Complete |
 | MIG-05 | Phase 12 | Complete |
+| PRD-01 | Phase 13 | Complete |
+| PRD-02 | Phase 13 | Complete |
+| PRD-03 | Phase 13 | Complete |
+| PRD-04 | Phase 13 | Complete |
+| PRD-05 | Phase 13 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total

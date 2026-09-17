@@ -164,9 +164,9 @@ def test_excel_header_sanitized():
 
 # --- regresiones TEST-01 (seguridad) ---
 def test_expression_null_byte():
-    # regresión documenta bug conocido — ver CONCERNS.md §Security (null byte):
-    # Python 3.10 lanza ValueError crudo; 3.11+ lanza ExpressionError (subclase de ValueError)
-    with pytest.raises(ValueError):
+    # PRD-01: el null byte debe lanzar ExpressionError de forma uniforme
+    # (antes era ValueError crudo en 3.10 y ExpressionError en 3.11+).
+    with pytest.raises(ExpressionError):
         evaluate("\x00", {})
 
 
