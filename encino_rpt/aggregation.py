@@ -244,7 +244,8 @@ def _compute_totals_into(report, spec, rows, node, registry, deferred):
             node.totals.append(total)
             if ts.name:
                 key = f"{spec.name}.{ts.name}"
-                registry[key] = registry.get(key, 0) + val
+                # Un grupo vacío (total None) contribuye 0 al acumulado cruzado.
+                registry[key] = registry.get(key, 0) + (val if val is not None else 0)
 
 
 def _build_path_group(report, spec, rows, registry, deferred, visible):

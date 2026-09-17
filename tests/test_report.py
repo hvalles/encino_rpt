@@ -510,12 +510,8 @@ def test_count_expression_semantics():
     assert result.root.totals[0].value == 1
 
 
-# --- regresiones TEST-01 (crash/error) ---
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug conocido — ver CONCERNS.md §Known Bugs (totales nombrados None)",
-)
 def test_named_total_none_values():
+    # CORR-09: un total nombrado None (grupo vacío) no rompe el registro cruzado.
     rows = [{"monto": None}, {"monto": None}]
     rep = Report(rows)
     rep.group("global")
