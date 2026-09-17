@@ -5,104 +5,133 @@
 ## Test Framework
 
 **Runner:**
-- **pytest** `9.1.1` (dev dependency, `pyproject.toml:50`)
-- **pytest-cov** `7.1.0` (dev dependency, `pyproject.toml:55`)
-- Config: `[tool.pytest.ini_options]` in `pyproject.toml:44-46`:
+- `pytest` `9.1.1` (dev group, `pyproject.toml:50`)
+- Config: `[tool.pytest.ini_options]` (`pyproject.toml:44-46`)
   - `testpaths = ["tests"]`
-  - `pythonpath = ["."]` (allows `from encino_rpt import ...` without installation)
+  - `pythonpath = ["."]`
+
+**Coverage:**
+- `pytest-cov` `7.1.0` (dev group, `pyproject.toml:55`), backed by `coverage` `7.16.1`
+- Config: `[tool.coverage.run]` `source = ["encino_rpt"]`, `branch = false` (`pyproject.toml:81-83`); `[tool.coverage.report]` `fail_under = 80`, `show_missing = true`, `exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "if __name__ == .__main__.:"]` (`pyproject.toml:85-88`)
 
 **Assertion Library:**
-- Plain `assert` statements (no assertion helper library)
+- Built-in `assert` statements only. No `pytest` assertion plugins, no `unittest.TestCase`, no `hamcrest`/`pytest-check`.
 
 **Run Commands:**
 ```bash
-uv run pytest                                                        # Run all tests
-uv run pytest -v                                                     # Verbose
-uv run pytest tests/test_report.py::test_group_and_totals           # Single test
-uv run pytest --cov=encino_rpt --cov-report=term-missing --cov-fail-under=80   # Coverage gate (as in CI)
-uv run mypy encino_rpt                                               # Type check (CI quality job)
-uv run ruff check                                                    # Lint (CI test job)
-uv run ruff format --check encino_rpt tests                          # Format check (CI quality job)
+uv run pytest                                     # Run all tests
+uv run pytest tests/test_report.py                # Single file
+uv run pytest -k "expression"                     # Filter by name
+uv run pytest -x                                 # Stop at first failure
+uv run pytest --cov=encino_rpt --cov-report=term-missing --cov-fail-under=80  # Coverage gate (CI)
 ```
 
 ## Test File Organization
 
 **Location:**
-- All tests live in a single top-level `tests/` directory (separate from source; no co-located `__init__.py`, no `conftest.py`)
+- Separate top-level `tests/` directory (NOT co-located with source).
 
 **Naming:**
-- `tests/test_<area>.py`:
-  - `tests/test_report.py` — expression evaluator, builder, aggregation, totals, ordering, idempotency (555 lines)
-  - `tests/test_report_renderers.py` — `format_value`, HTML/CSV/Excel/PDF/Text/JSON renderers, links/images (357 lines)
-  - `tests/test_security.py` — formula injection, DoS limits, HTML/CSS injection, template param validation (178 lines)
-  - `tests/test_perf_smoke.py` — wall-clock perf gate on a 50k-row pivot (31 lines)
+- Files: `tests/test_<area>.py` — `test_report.py`, `test_report_renderers.py`, `test_security.py`, `test_readers.py`, `test_perf_smoke.py`
+- Functions: `test_<behavior>` — `test_expression_arithmetic`, `test_csv_formula_injection`, `test_order_by_missing_total_raises`
 
 **Structure:**
 ```
 tests/
-├── test_report.py            # engine + builder + regression/xfail
-├── test_report_renderers.py  # renderers + format_value
-├── test_security.py          # security mitigations
-└── test_perf_smoke.py        # performance smoke gate
+├── test_report.py             # expression evaluator + builder/aggregation + idempotency + regressions
+├── test_report_renderers.py   # renderer output (html/csv/text/markdown/excel/pdf/json) + format_value
+├── test_security.py           # formula injection, DoS limits, CSS injection, template validation
+├── test_readers.py            # Report.read / encino_rpt.readers (CSV/TSV/JSON/JSONL/tuples/excel)
+└── test_perf_smoke.py         # wall-clock perf smoke (50k rows, no benchmark framework)
 ```
 
 ## Test Structure
 
 **Suite Organization:**
-- Flat top-level test functions (no classes, no fixtures, no `conftest.py`)
-- Section banner comments group related tests: `# --- evaluador de expresiones ---`, `# --- builder / agregación ---`, `# --- idempotencia ---`, `# --- rendimiento ---` (`tests/test_report.py`); `# --- Link/Image ---`, `# --- layout (FEAT-02) ---` (`tests/test_report_renderers.py`); `# --- P1: inyección de fórmulas ---` (`tests/test_security.py`)
-- Tests build a `Report(rows)` inline, configure it fluently, call `run()`, then assert on the returned `ReportResult`
+- Tests are grouped by section comment markers (`# --- <topic> ---`) rather than classes. Each test builds a `Report` fluently, runs it, then asserts on the canonical tree.
+
+```python
+# --- builder / agregación ---
+def test_group_and_totals():
+    rows = [
+        {"agente": "Ana", "monto": 100},
+        {"agente": "Ana", "monto": 50},
+        {"agente": "Bob", "monto": 200},
+    ]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").header("Agente {{agente}}")
+    rep.section("por_agente").total("sum", "monto")
+    rep.group("global")
+    rep.section("global").total("sum", "monto")
+    result = rep.run()
+
+    root = result.root
+    assert root.name == "global"
+    assert root.totals[0].value == 350
+    assert len(root.children) == 2
+```
+(`tests/test_report.py:63-85`)
 
 **Patterns:**
-- Setup: inline data + fluent builder, no setup/teardown hooks
-- Assertion: direct `assert` on canonical model fields (`result.root.totals[0].value == 350`) or rendered output strings (`assert "<table>" in html_out`)
-- Idempotency assertion: `assert first.model_dump() == second.model_dump()` (`tests/test_report.py:349`)
-- No `pytest.raises(...)` without `match=`: every exception test pins the Spanish error message, e.g. `pytest.raises(ValueError, match="corte ya declarado")` (`tests/test_report.py:357`)
+- Inline fixture data: each test builds its own `rows` list literal (no shared fixtures, no `conftest.py`).
+- Assert on the pydantic tree directly: `result.root.children[0].row["total"] == 20.0`, `result.columns == [...]`, `result.kpis[0].value == 300`.
+- Renderer tests assert on string output: `assert "<table>" in html_out`, `assert "A,2" in csv_out`, `assert pdf[:5] == b"%PDF-"`.
+- Excel tests assert on `openpyxl` cell values: `ws["A1"].value == "sku"`, `cell.data_type == "s"`.
+- Regression tests carry a tag in a comment referencing the ticket: `# CORR-11:`, `# CORR-08:`, `# TEST-01`, `# MA-01`, `# TMPL-01`, `# JSON-01`, `# P1`–`# P5`.
 
 ## Mocking
 
-**Framework:** None. No `unittest.mock`, no `monkeypatch`, no `pytest-mock`.
+**Framework:** `pytest` built-ins only — `monkeypatch` fixture and `pytest.importorskip`. No `unittest.mock` in tests, no `pytest-mock` plugin.
 
-**Patterns:** Tests exercise real objects end-to-end (integration-style). The only "fake" is a hand-rolled `value_fn` closure in `test_pivot_single_pass` (`tests/test_report.py:412-417`) used to count how many times groups are aggregated (single-pass assertion: `assert len(processed) == 3 + 2 + 2`).
+**Patterns:**
+```python
+# Simulate a missing optional dependency (openpyxl) to exercise the ImportError branch
+def test_excel_missing_extra(monkeypatch):
+    monkeypatch.setitem(sys.modules, "openpyxl", None)
+    with pytest.raises(ImportError):
+        read_rows("datos.xlsx", format="excel")
+```
+(`tests/test_readers.py:160-163`)
 
-**What to Mock:** Nothing — the library has no I/O or external services; heavy aggregates are delegated to SQL by design (non-goal).
+**Skipping optional dependencies:**
+```python
+def test_excel_renderer():
+    pytest.importorskip("openpyxl")
+    ...
+```
+(`tests/test_report_renderers.py:208-209`, `tests/test_security.py:19-20`)
 
-**What NOT to Mock:** The expression evaluator, aggregation engine, and renderers are always tested against real implementations.
+**What to Mock:**
+- Optional dependency absence (`openpyxl`, `reportlab`) via `monkeypatch.setitem(sys.modules, ...)` and `pytest.importorskip` for skip-when-missing.
+
+**What NOT to Mock:**
+- The aggregation engine, renderers, and pydantic models are always exercised for real. No mocking of `Report`, `build()`, or `walk()` — tests run the full pipeline and assert on real output.
 
 ## Fixtures and Factories
 
-**Test Data:** Inline `list[dict]` literals defined inside each test, e.g.:
-```python
-rows = [
-    {"agente": "Ana", "monto": 100},
-    {"agente": "Ana", "monto": 50},
-    {"agente": "Bob", "monto": 200},
-]
-rep = Report(rows)
-rep.group("por_agente", columns="agente")
-rep.section("por_agente").total("sum", "monto")
-```
+**Test Data:**
+- Inline `rows` list literals with small hand-picked data (2–3 rows typical), constructed at the top of each test.
+- Large/synthetic data built with comprehensions in perf tests: `rows = [{"region": f"r{i % 50}", ...} for i in range(n)]` (`tests/test_perf_smoke.py:13-16`).
 
-**Location:** No shared fixtures/factories — data is local to each test function (a `conftest.py` is intentionally absent).
+**Built-in fixtures used:**
+- `tmp_path` — for writing real CSV/XLSX files: `path = tmp_path / "datos.csv"; path.write_text(...)` (`tests/test_readers.py:36-38`)
+- `monkeypatch` — for dependency simulation (`tests/test_readers.py:160`)
+
+**Local helper functions:**
+- Module-level private helpers that build a reusable report: `_streaming_report()` (`tests/test_report_renderers.py:479-485`), consumed by multiple `iter_*`/`to_*_file` tests.
+
+**Location:**
+- No `conftest.py`, no `fixtures/` directory, no factory-boy. Fixtures are in-test or tiny local helpers.
 
 ## Coverage
 
-**Requirements:** `fail_under = 80` enforced via `[tool.coverage.report]` in `pyproject.toml:85-88`, run as `--cov-fail-under=80` in the CI `quality` job (`.github/workflows/ci.yml:53`).
-
-**Coverage config** (`pyproject.toml:81-88`):
-```toml
-[tool.coverage.run]
-source = ["encino_rpt"]
-branch = false
-
-[tool.coverage.report]
-fail_under = 80
-show_missing = true
-exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "if __name__ == .__main__.:"]
-```
-- `source = ["encino_rpt"]` — only library code is measured (tests excluded)
-- `branch = false` — line coverage only
-- `exclude_lines` matches the `# pragma: no cover - depende del entorno` markers on the optional-dep `ImportError` branches (`encino_rpt/renderers/excel.py:47`, `encino_rpt/renderers/pdf.py:41`)
+**Requirements:**
+- Enforced gate: `fail_under = 80` (`pyproject.toml:86`), enforced in CI via `--cov-fail-under=80` (`.github/workflows/ci.yml:53`).
+- Current coverage ~84% (above the gate).
+- `source = ["encino_rpt"]` scopes coverage to the package only (`pyproject.toml:82`).
+- `show_missing = true` prints uncovered lines in `term-missing` output.
+- `exclude_lines` (`pyproject.toml:88`) excludes `# pragma: no cover` (used for optional-dependency `ImportError` branches and environment-dependent code), `if TYPE_CHECKING:`, and `if __name__ == "__main__":`.
 
 **View Coverage:**
 ```bash
@@ -112,65 +141,77 @@ uv run pytest --cov=encino_rpt --cov-report=term-missing
 ## Test Types
 
 **Unit Tests:**
-- Expression evaluator (`tests/test_report.py:8-38`): arithmetic, functions, unsafe-node rejection
-- `format_value` precision/formatting (`tests/test_report_renderers.py:8-55`): currency, percent, thousands, sci-notation extremes
-- Sanitizers (`tests/test_security.py`): `is_dangerous`, `sanitize_csv` with space/BOM/`\x0c` prefixes
+- Expression evaluator: `test_expression_arithmetic`, `test_expression_functions`, `test_expression_rejects_unsafe` (`tests/test_report.py:8-38`)
+- Value formatting: `test_format_value_currency`, `test_format_value_percent`, `test_format_value_precision_*` (`tests/test_report_renderers.py:8-54`)
+- Type coercion: `test_coerce_scalars`, `test_coerce_non_finite_kept_as_str` (`tests/test_readers.py:14-32`)
+- Sanitization: `test_is_dangerous_leading_space_bom`, `test_sanitize_csv_leading_space_bom` (`tests/test_security.py:32-42`)
 
 **Integration Tests:**
-- Full report build → `run()` → `ReportResult` assertions (groups, totals, conditional totals, phase-B `TOTAL(...)`, cumulative, charts, pivots, order/top/suppress, KPIs)
-- Renderers: each renderer tested by building a report and asserting on its output (`to_csv`, `to_text`, `render_html`, `to_excel`, `to_pdf`, `to_json`)
-- JSON round-trip: `json.loads(result.to_json())` then `ReportResult.model_validate(data)` (`tests/test_report_renderers.py:289-306`)
-- Model round-trip: `result.model_dump()` then `ReportResult.model_validate(data)` (`tests/test_report.py:303-311`)
+- Builder → aggregation → canonical tree: `test_basic_report_and_hidden_fields`, `test_group_and_totals`, `test_path_group` (`tests/test_report.py`)
+- Builder → renderer output: `test_text_renderer`, `test_csv_renderer`, `test_html_renderer_and_styles`, `test_markdown_renderer`, `test_excel_renderer`, `test_pdf_renderer` (`tests/test_report_renderers.py`)
+- Readers → builder: `test_read_csv_path`, `test_read_jsonl`, `test_excel_reader` (`tests/test_readers.py`)
 
-**Performance Tests:**
-- `tests/test_perf_smoke.py` — 50k-row pivot smoke gate using `time.perf_counter()` with a hard 10s wall-clock assertion: `assert elapsed < 10.0` (no `pytest-benchmark`, no markers)
-- Deep-tree recursion guards: `test_path_group_deep_no_recursion` (1100-depth path, `tests/test_report.py:426-448`) and `test_deep_path_renders_iteratively` (`tests/test_report_renderers.py:309-322`)
+**Security Tests (dedicated file `tests/test_security.py`):**
+- Formula injection: CSV prefix (`test_csv_formula_injection`), Excel `data_type == "s"` (`test_excel_formula_injection`), leading space/BOM (`test_is_dangerous_leading_space_bom`)
+- DoS limits: `test_expression_pow_limit`, `test_expression_complexity_limit`, `test_expression_float_exponent_limit`
+- CSS/HTML injection: `test_html_style_injection_mitigated`, `test_html_style_value_injection_mitigated`, `test_html_css_mode_injection_mitigated`
+- Template validation: `test_template_param_validation`, `test_unknown_template_token_raises`
 
-**E2E Tests:** Not used (this is a library with no server/runtime).
+**Perf Smoke Tests:**
+- `tests/test_perf_smoke.py` — wall-clock bounded via `time.perf_counter()` (no `pytest-benchmark`, no markers). `test_pivot_50k_rows_smoke` asserts `elapsed < 10.0`. Structural complexity guards also live in `test_report.py` (`test_pivot_single_pass`, `test_path_group_deep_no_recursion`).
+
+**E2E Tests:**
+- Not used. No Selenium/Playwright; the library has no web UI. HTML output is asserted as string fragments.
 
 ## Common Patterns
 
-**Error Testing:**
+**Error Testing (the dominant pattern):**
 ```python
-with pytest.raises(ValueError, match="total de orden inexistente: 'total_inexistente'"):
+with pytest.raises(ValueError, match="corte ya declarado"):
+    rep.group("g", columns="a")
+```
+(`tests/test_report.py:357-358`)
+
+```python
+with pytest.raises(AggregationError, match="grupo 'global'"):
     rep.run()
 ```
-Multiple exception types are asserted separately (e.g. `test_template_param_validation` checks both `IndexError` and `ValueError`, `tests/test_security.py:88-93`).
+(`tests/test_report.py:377-378`)
 
-**Optional dependency skipping:**
 ```python
-def test_excel_renderer():
-    pytest.importorskip("openpyxl")
-    ...
+with pytest.raises(ExpressionError):
+    evaluate("__import__('os')", {})
 ```
-`pytest.importorskip("openpyxl")` / `pytest.importorskip("reportlab")` guard every Excel/PDF test (`tests/test_report_renderers.py:99,116,135,165,177,201,240`, `tests/test_security.py:20,46,127,144,163`). Tests run against the `dev` dependency group which always installs `openpyxl` + `reportlab`, so these only skip on minimal environments.
+(`tests/test_report.py:33-34`)
 
-**Known-bug regression tests (xfail):**
+- Use `pytest.raises(ExceptionType, match="...")` with a Spanish substring to assert both type and message. Errors are raised at `run()` time, so the `rep.run()` call is inside the context manager.
+
+**Idempotency Testing:**
 ```python
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug conocido — ver CONCERNS.md §Known Bugs (detail(source=...) ignorado)",
-)
-def test_detail_source_ignored():
-    ...
+first = rep.run()
+second = rep.run()
+assert first.model_dump() == second.model_dump()
 ```
-Three `strict=True` xfail tests document known bugs with a `CONCERNS.md` cross-reference:
-- `test_detail_source_ignored` (`tests/test_report.py:487-499`)
-- `test_named_total_none_values` (`tests/test_report.py:514-525`)
-- `test_chart_pivot_error_context` (`tests/test_report.py:540-555`)
+(`tests/test_report.py:347-349`)
 
-Other regression tests are *passing* but comment the bug they pin (e.g. `test_suppress_zero_missing_column`, `test_count_expression_semantics`, `test_unhashable_group_value`, `test_expression_null_byte`, `test_deep_tree_to_json`, `test_excel_styles_footer_dead_params`).
-
-**Inline imports for internals under test:**
+**Round-trip Testing (pydantic serialization):**
 ```python
-from encino_rpt.aggregation import AggregationError   # inside the test function
-from encino_rpt._specs import PivotSpec               # internal module accessed directly
-from encino_rpt.pivot import build_pivot
+data = result.model_dump()
+restored = ReportResult.model_validate(data)
+assert restored.columns == ["sku", "cantidad"]
 ```
+(`tests/test_report.py:303-311`)
 
-**Test count:** ~82 tests total — 79 passed + 3 `xfail(strict=True)`.
+**Streaming parity Testing:**
+```python
+result = _streaming_report()
+assert list(result.iter_csv()) == result.to_csv().splitlines()
+assert "".join(result.iter_html()) == result.render_html()
+```
+(`tests/test_report_renderers.py:488-514`)
 
-**Async Testing:** Not applicable — the library is fully synchronous; no `async`/`await`, no `pytest-asyncio`.
+**Async Testing:**
+- Not applicable. The entire library is synchronous (no `async`/`await`, no event loop). No `pytest-asyncio`, no `asyncio` fixtures.
 
 ---
 

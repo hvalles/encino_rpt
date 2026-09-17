@@ -2,236 +2,195 @@
 
 **Analysis Date:** 2026-09-17
 
-> Scope: full repo. Phases 1–8 complete (milestone `v1.0`). CI gaps (no type checker/format/coverage) are RESOLVED — mypy `2.3.1`, `ruff format --check`, coverage `fail_under=80`, and a split `test`+`quality` job matrix now run in `.github/workflows/ci.yml`. The engine bugs below are **documented, not fixed**; each carries a regression test (some `xfail(strict=True)`, others asserting the current behavior) with a `# CONCERNS.md` pointer. Reflect current state.
+> Scope: full repo. The 7 engine bugs from Phase 11 (`detail(source=)`, named-total `None`, chart/pivot context, `suppress_zero` missing column, unhashable grouping, `count` semantics, deep-tree JSON) are **RESOLVED** and are documented only as "previously flagged — now fixed" below. Dead params (`ExcelRenderer.styles`, footer `column_position`, chart/pivot `source`) were removed. `pydantic` is pinned `>=2,<3`, extras pinned with lower bounds, and streaming output (`iter_*` + `file=`) is implemented. Only the items below remain open.
+
+---
+
+## Still-Open: Infrastructure
+
+### GitHub Pages is DISABLED on the repo (docs deploy fails)
+
+- Issue: The `Docs` workflow (`deploy` job) fails at `actions/configure-pages@v5` because `GET /repos/hvalles/encino_rpt/pages` returns **404** — GitHub Pages is not enabled on the repository. The workflow itself is correct (permissions `pages: write` / `id-token: write` at `.github/workflows/docs.yml:7-10`, `configure-pages` + `upload-pages-artifact` + `deploy-pages`). The `mkdocs build` step passes.
+- Files: `.github/workflows/docs.yml`
+- Impact: Every push to `main` produces a red `Docs` check; published documentation at `https://hvalles.github.io/encino_rpt/` is stale or absent.
+- Fix approach: **Manual owner action, not a code fix** — Repo Settings → Pages → Source = "GitHub Actions" (and enable Pages). No change to `docs.yml` required.
 
 ---
 
 ## Tech Debt
 
-**Dead parameter — `detail(source=...)` is silently ignored:**
-- Issue: `Report.detail(*columns, source=None)` accepts `source` but never stores or uses it — the body is only `self._detail = list(columns)` (`encino_rpt/report.py:282-293`). Detail rows always come from the primary dataset, unlike fields/groups/KPIs which honor `source` via `_enrich` (`encino_rpt/aggregation.py:130`) and `_build_group` (`encino_rpt/aggregation.py:193`).
-- Files: `encino_rpt/report.py:282-293`, `encino_rpt/aggregation.py:123-152`
-- Impact: A developer calling `detail(..., source="presupuesto")` silently gets primary-row data — a correctness trap with no error.
-- Fix approach: Either drop the `source` kwarg from `detail()` (breaking the public signature) or plumb it through — introduce a per-detail source that `_build_instance`/`_build_path_group` consult when materializing `Detail` nodes, mirroring `_build_group`'s `sources.get(spec.source, sources[None])`.
-- Regression: `tests/test_report.py:487-499` (`test_detail_source_ignored`, `xfail(strict=True)`).
+### `column_position` honored only by the Excel renderer
 
-**Dead parameter — `ExcelRenderer.styles` / `to_excel(styles=...)`:**
-- Issue: `ExcelRenderer.__init__(styles=...)` stores `self.styles = styles or {}` (`encino_rpt/renderers/excel.py:23-26`) but `_walk`/`_chart`/`_pivot`/`_total_row` never read `self.styles`. `render(styles=...)` and `ReportResult.to_excel(styles=...)` (`encino_rpt/models.py:189-202`) thread the dict to a no-op.
-- Files: `encino_rpt/renderers/excel.py:23-29,77-131`, `encino_rpt/models.py:189-202`
-- Impact: `to_excel(styles={"bold": True})` silently does nothing — callers believe they're styling cells.
-- Fix approach: Implement `styles` as a per-row-type style map (or remove it). If kept, apply it in `_total_row`/`_full_row`/`_write_value`.
-- Regression: `tests/test_report_renderers.py:343-357` (`test_excel_styles_footer_dead_params` asserts the no-op doesn't crash).
+- Issue: `Total.column_position` is declared (`encino_rpt/models.py:53`), threaded through `TotalSpec` (`encino_rpt/_specs.py:38`) and `Section.total()` (`encino_rpt/section.py:46,59`), and used by `ExcelRenderer` to align a total under a specific column (`encino_rpt/renderers/excel.py:105-109`). The other five renderers (HTML, CSV, Text, PDF, Markdown) ignore it entirely — totals always render as a full-width row or a two-cell label/value pair.
+- Impact: A user setting `column_position` sees the alignment only in Excel output; other formats silently diverge. Not a correctness bug (the value is still emitted), but a feature-completeness gap that can surprise.
+- Fix approach: Either document `column_position` as Excel-only in `Section.total()`'s docstring, or implement alignment in the HTML/CSV/Text renderers (larger effort).
 
-**Dead parameter — `footer(column_position=...)`:**
-- Issue: `Section.footer(column_position=...)` stores `GroupSpec.footer_column_position` (`encino_rpt/_specs.py:90`, set at `encino_rpt/section.py:37`) but no renderer reads it. Footers render as full-width rows: `_full_row` in `encino_rpt/renderers/excel.py:104-105`, HTML `encino_rpt/renderers/html.py:82-85`, text `encino_rpt/renderers/text.py:51-52`, CSV `encino_rpt/renderers/csv.py:62-63`, PDF `encino_rpt/renderers/pdf.py:103-104`.
-- Files: `encino_rpt/_specs.py:90`, `encino_rpt/section.py:26-38`
-- Impact: Footer alignment hint is discarded; output never honors it.
-- Fix approach: Render footer aligned to the named column like `Total.column_position` is (`encino_rpt/renderers/excel.py:109-113`), or remove the param.
+### `_partition` unhashable-detection does redundant work on the error path
 
-**Dead parameters — chart/pivot `source=`:**
-- Issue: `ChartSpec.source` (`encino_rpt/_specs.py:50`) and `PivotSpec.source` (`encino_rpt/_specs.py:63`) are declared and set via `Section.chart/pivot(..., source=)` (`encino_rpt/section.py:84,120`), but `build_chart` (`encino_rpt/charts.py:8`) and `build_pivot` (`encino_rpt/pivot.py:10`) never receive or read them; `_build_instance` calls both with the already-selected `rows` (`encino_rpt/aggregation.py:354-367`). Contrast `KpiSpec.source`/`GroupSpec.source`, which are honored.
-- Files: `encino_rpt/_specs.py:50,63`, `encino_rpt/aggregation.py:354-367`
-- Impact: `chart(source=...)`/`pivot(source=...)` silently aggregate over the section's own rows regardless of `source`.
-- Fix approach: Pass `spec.source` through to a `sources`-aware row selection, or drop the kwarg.
+- Issue: `_partition` builds the group key, calls `hash(key)`; on `TypeError` it re-iterates every column calling `hash(value)` to identify the offending column (`encino_rpt/aggregation.py:196-207`). This is a second full hash pass that only runs on the failure path, and the trailing `raise` (line 207) re-raises the raw `TypeError` for a case that cannot normally occur (tuple hash failure must come from an unhashable element).
+- Impact: Negligible runtime cost (error path only); the trailing bare `raise` is a latent untyped error path.
+- Fix approach: Identify the unhashable column in a single pass (e.g., by checking hashability while constructing the key), and drop the unreachable `raise`.
 
-**`count` aggregate semantics are inconsistent:**
-- Issue: `_value_for` (`encino_rpt/aggregation.py:71-88`) computes `count` three different ways: with an `expression` → `sum(1 for v in vals if v)` (truthy count, line 80-81); with `column` and no expression → `_aggregate("count", vals)` which filters `None` then `len(vals)` (non-None count, line 87-88); with neither → `len(rows)` (line 85-86). Same operator, three meanings.
-- Files: `encino_rpt/aggregation.py:54-88`
-- Impact: `count` over `[10, -5, 0]` yields `3` with `column=`, but `count(expression="monto > 0")` yields truthy-count semantics. Financial reports mixing both forms get surprising counts.
-- Fix approach: Decide and document one contract (e.g., `count` = number of rows, `count(expression)` = number of truthy evaluations) and align `_value_for`.
-- Regression: `tests/test_report.py:502-510` (`test_count_expression_semantics` asserts the current truthy behavior).
+### `ExcelRenderer` holds transient mutable state on `self`
 
-**Stale build artifacts:**
-- Issue: `dist/` holds `encino_rpt-0.2.0-py3-none-any.whl` and `encino_rpt-0.2.0.tar.gz` while `pyproject.toml:10` declares `version = "0.2.1"`. `dist/` is gitignored and only rebuilt by CI (`uv build` in `.github/workflows/publish.yml:19`), so the local artifacts are one version behind.
-- Files: `dist/encino_rpt-0.2.0-*`, `pyproject.toml:10`
-- Impact: A developer installing from `dist/` locally gets 0.2.0, not 0.2.1.
-- Fix approach: Rebuild `dist/` after a version bump, or delete it (gitignored; CI regenerates).
+- Issue: `ExcelRenderer.render()` writes `self._ws`, `self._result`, `self._formulas`, `self._row` (`encino_rpt/renderers/excel.py:51-54`). The renderer is not re-entrant — concurrent or interleaved renders of the same instance would corrupt each other.
+- Impact: Low in practice (renderers are typically short-lived per render), but it is a latent footgun for any future async/threaded consumer.
+- Fix approach: Pass state as locals/parameters or construct a fresh renderer per render; remove instance-level scratch attributes.
+
+### Perf smoke test relies on a wall-clock threshold
+
+- Issue: `tests/test_perf_smoke.py:11-31` asserts a 50k-row pivot completes in `< 10.0s` using `time.perf_counter()`. On slow/oversubscribed CI runners this can flake even though the algorithm is fine.
+- Impact: Occasional false-red `test` job; not a product defect.
+- Fix approach: Raise the ceiling, or gate on a ratio (e.g., "10x the median of 3 runs"), or move the timing gate to a separate non-blocking job.
 
 ---
 
 ## Known Bugs
 
-**`suppress_zero(column=...)` with a missing column suppresses every child:**
-- Symptoms: `section("global").suppress_zero(column="columna_inexistente")` removes all children — `len(result.root.children) == 0`.
-- Files: `encino_rpt/aggregation.py:428-444` (`_is_zero`), `encino_rpt/aggregation.py:373-385` (`_apply_order`)
-- Trigger: `_is_zero` returns `v is None or v == 0`; for a `Group` child `child.key.get(column)` yields `None` when the column isn't in the key, so the child is treated as zero and filtered.
-- Workaround: Use `suppress_zero(total=...)` with a named total instead, or ensure the column exists in the group key.
-- Regression: `tests/test_report.py:471-484` (`test_suppress_zero_missing_column`, asserts the buggy 0-children behavior).
+### Null byte in expressions: inconsistent error type across Python versions
 
-**`detail(source=...)` ignored — detail always uses primary rows:**
-- Symptoms: `rep.detail("sku", "monto", source="presupuesto")` still renders primary-dataset rows.
-- Files: `encino_rpt/report.py:282-293`
-- Trigger: `source` kwarg is never consumed.
-- Regression: `tests/test_report.py:487-499` (`test_detail_source_ignored`, `xfail(strict=True)`).
-
-**Unhashable group column values crash with a raw `TypeError`:**
-- Symptoms: Grouping by a column whose value is a `list`/`dict` raises `TypeError: unhashable type: 'list'`.
-- Files: `encino_rpt/aggregation.py:178-189` (`_partition`, `key = tuple(r.get(c) for c in spec.columns)` at line 184); also `encino_rpt/pivot.py:16-19,49-56` (`_ordered_unique` `seen.add(v)` and `row_index`/`col_index` dicts keyed by raw values)
-- Trigger: `tuple`/`dict` membership and dict-key lookups require hashable elements; the buggy path produces a tuple containing an unhashable element, then `key not in index` raises.
-- Fix approach: Either validate group keys are hashable up-front with a clear `AggregationError`, or map unhashable keys to a stable string/normalized form.
-- Regression: `tests/test_report.py:528-537` (`test_unhashable_group_value`, expects `TypeError`).
-
-**Named totals with `None` value crash in the registry accumulator:**
-- Symptoms: A named total whose value is `None` (e.g. `avg` over an all-`None` column) raises `TypeError` instead of recording `None`.
-- Files: `encino_rpt/aggregation.py:214-236` (`_compute_totals_into`, `registry[key] = registry.get(key, 0) + val` at line 235)
-- Trigger: `_aggregate("avg", ...)` returns `None` when the filtered value list is empty (`encino_rpt/aggregation.py:59`); then `0 + None` raises during registry registration. Same hazard for deferred `TOTAL()` references whose base total is `None`.
-- Fix approach: Guard `val is None` when accumulating (`registry[key] = (registry.get(key, 0) or 0) + (val or 0)` or `0 if val is None`), or skip registration for `None` values.
-- Regression: `tests/test_report.py:513-525` (`test_named_total_none_values`, `xfail(strict=True)`).
-
-**chart/pivot expression errors are not wrapped with context:**
-- Symptoms: A failing chart/pivot `expression` raises raw `ExpressionError` (or `ZeroDivisionError` re-wrapped by `evaluate`) with no group context, unlike totals/fields which go through `_wrap`.
-- Files: `encino_rpt/aggregation.py:352-368` (`_build_instance` calls `build_chart`/`build_pivot` directly, no `_wrap`), `encino_rpt/aggregation.py:34-43` (`_wrap`), `encino_rpt/expressions.py:90-93`
-- Trigger: `chart("bar", expression="1 / (monto - 1)")` on a row where `monto == 1` raises from inside `_value_for` (`encino_rpt/aggregation.py:79`) without the `{grupo}` prefix that totals get.
-- Fix approach: Wrap the `fn(...)` calls at `encino_rpt/aggregation.py:358,367` with `_wrap(f"chart/pivot (grupo {spec.name!r})", fn, rows)`.
-- Regression: `tests/test_report.py:540-555` (`test_chart_pivot_error_context`, `xfail(strict=True)`).
-
-**Deep hierarchies crash `to_json()` / `model_dump()`:**
-- Symptoms: A `path=` group tree of ~1100 levels renders fine in HTML/CSV/text/Excel, but `ReportResult.to_json()` raises `ValueError: Circular reference detected (depth exceeded)`.
-- Files: `encino_rpt/renderers/json.py:25-27` (`to_dict` → `result.model_dump(mode="json")`), `encino_rpt/models.py:111-126` (recursive `Group.children`)
-- Trigger: pydantic-core enforces a recursion depth limit (~1000) when serializing recursive models; the path-group builder can create arbitrarily deep trees (`encino_rpt/aggregation.py:238-307`).
-- Fix approach: Serialize iteratively (e.g. explicit stack in `JsonRenderer.to_dict`) or document a depth ceiling for the JSON renderer.
-- Regression: `tests/test_report_renderers.py:326-340` (`test_deep_tree_to_json`, expects the `ValueError`).
+- Symptoms: `evaluate("\x00", {})` raises a raw `ValueError` on Python 3.10, but an `ExpressionError` (subclass of `ValueError`) on Python 3.11+.
+- Files: `encino_rpt/expressions.py:55-64` (`evaluate` catches `RecursionError`, `MemoryError`, `SyntaxError` — but **not** `ValueError`); regression pinned at `tests/test_security.py:166-170`.
+- Trigger: A user-supplied expression containing a NUL byte (`\x00`). On 3.10 `ast.parse` raises `ValueError("source code string cannot contain null bytes")`, which is not caught and propagates un-wrapped; on 3.11+ `ast.parse` raises `SyntaxError`, which is caught and wrapped as `ExpressionError`.
+- Workaround: The test asserts only `pytest.raises(ValueError)`, so both paths pass. Consumers doing `except ExpressionError` would miss the 3.10 raw `ValueError`.
+- Fix approach: Add `ValueError` to the `except` tuple in `evaluate` (line 60), wrapping it as `ExpressionError` for a uniform, documented error type across all supported Python versions (3.10–3.13).
 
 ---
 
 ## Security Considerations
 
-**Null-byte expression error is inconsistent across supported Python versions:**
-- Risk: `evaluate("\x00", {})` produces different exception types per interpreter — raw `ValueError` on Python 3.10, `ExpressionError` (a `ValueError` subclass) on 3.11+.
-- Files: `encino_rpt/expressions.py:55-64` (`except (RecursionError, MemoryError, SyntaxError)` does **not** catch `ValueError`)
-- Current mitigation: None — the error still propagates, just with an inconsistent type. Not an injection vector (null bytes can't execute code), but it breaks the "one error contract" guarantee.
-- Recommendations: Add `ValueError` to the `except` tuple at `encino_rpt/expressions.py:60`, normalizing null-byte input to `ExpressionError` on every supported version (CI matrix includes 3.10 — `.github/workflows/ci.yml:13`).
-- Regression: `tests/test_security.py:155-159` (`test_expression_null_byte`).
+The security posture is strong and was explicitly hardened (Phases 1, 3, 4). Verified current state:
 
-**Formula-injection sanitization is otherwise solid:**
-- The CSV/Excel formula sanitizer (`encino_rpt/renderers/_sanitize.py`) covers `= + - @ \t \r` prefixes and leading whitespace/BOM/`\x0c` via `_LEADING_TRIM` (`encino_rpt/renderers/_sanitize.py:7-16`). HTML CSS-injection is mitigated by `_SAFE_PROP`/`_UNSAFE_VALUE` (`encino_rpt/renderers/html.py:21-22,164-182`). No outstanding injection vector detected.
+- No `eval`/`exec` anywhere; expressions go through the `ast` whitelist walker (`encino_rpt/expressions.py:55-123`) with `_MAX_NODES=1000`, `_MAX_DEPTH=100`, `_MAX_POW_EXP=10000` (`encino_rpt/expressions.py:46-48`). No `__import__`, `subprocess`, `pickle`, or `os.` imports anywhere in `encino_rpt/`.
+- OWASP formula-injection mitigation is centralized in `encino_rpt/renderers/_sanitize.py` (`is_dangerous`, `sanitize_csv`, `write_excel_cell`) and applied to CSV + Excel detail cells, headers, footers, totals, pivots, charts, and KPIs. Leading whitespace/BOM is stripped before prefix detection (`_sanitize.py:9,14-16`).
+- HTML conditional-style injection is mitigated via `_SAFE_PROP` / `_UNSAFE_VALUE` regexes (`encino_rpt/renderers/html.py:22-23`) in both inline and `css=True` class modes; the `<style>` block reuses the same sanitizers (no new injection surface).
+- Template `{{param.N}}` is validated (numeric + in-range) and unresolved tokens raise `KeyError` (`encino_rpt/template.py:20-31`).
+
+Remaining items:
+
+### Null byte handling (see Known Bugs)
+
+- Risk: A NUL byte in an expression yields an inconsistent exception type across Python 3.10 vs 3.11+, which can bypass a caller's `except ExpressionError` handler on 3.10. It cannot execute code (still goes through the AST whitelist), so it is a robustness issue, not a code-execution risk.
+- Files: `encino_rpt/expressions.py:55-64`.
+- Recommendation: Normalize the exception type (add `ValueError` to the caught set), as above.
+
+### No fuzzing / property-based tests for the expression evaluator or sanitizers
+
+- Risk: The `ast` whitelist walker and the CSV/Excel sanitizers are only covered by hand-written cases (`tests/test_security.py`). A malformed-but-valid expression or an unusual sanitizer input could introduce a regression silently.
+- Files: `encino_rpt/expressions.py`, `encino_rpt/renderers/_sanitize.py`, `encino_rpt/template.py`.
+- Recommendation: Add property-based tests (e.g., `hypothesis`) asserting that arbitrary `str` inputs to `evaluate` never raise anything other than `ExpressionError`/`ValueError`, and that `is_dangerous`/`sanitize_csv` are idempotent and never emit a live formula prefix.
 
 ---
 
 ## Performance Bottlenecks
 
-**Deep-tree JSON serialization (see Known Bugs):**
-- Problem: `model_dump()` hits pydantic-core's recursion limit (~1000) for deep path hierarchies, making JSON the only renderer that cannot emit deep trees.
-- Files: `encino_rpt/renderers/json.py:27`, `encino_rpt/models.py:111-126`
-- Cause: recursive pydantic model + depth-limited serializer.
-- Improvement path: iterative serialization in `JsonRenderer.to_dict`, or an explicit documented depth cap.
+### Deep-tree JSON serialization (recursion limit)
 
-**In-memory full-copy enrichment:**
-- Problem: `build()` materializes an enriched copy of every dataset (`sources = {None: _enrich(...)}` plus one per `add_dataset`, `encino_rpt/aggregation.py:543-545`). `_enrich` copies each row (`dict(row)`) and appends computed fields (`encino_rpt/aggregation.py:123-152`). Memory is O(rows × (source columns + computed fields)).
-- Cause: deliberate in-memory design; heavy aggregation is a documented non-goal (delegated to SQL `ROLLUP`/`CUBE`).
-- Improvement path: None required for v1; consider streaming/lazy enrichment only if large-input support moves in-scope.
+- Problem: `to_json()`/`JsonRenderer.render()` serialize via pydantic's recursive `model_dump(mode="json")`, which hits Python's recursion limit / pydantic's depth limit for deeply nested trees (e.g., a `path=` column with ~1100 levels). The engine itself builds the tree iteratively (no recursion), and `walk()` (`encino_rpt/renderers/_walk.py`) is iterative, so HTML/CSV/Text/PDF/Markdown render fine — only JSON fails.
+- Files: `encino_rpt/renderers/json.py:32-55` (catches `RecursionError`/depth `ValueError` and raises `ValueError("la jerarquía es demasiado profunda...")`); regression at `tests/test_report_renderers.py:436-448`.
+- Cause: pydantic serialization is inherently recursive; no depth guard exists before serialization.
+- Improvement path: Documented mitigation today (clear `ValueError`, no raw `RecursionError`). A full fix would require an iterative JSON serializer or a pre-flight depth check that rejects with a clearer bound earlier in the pipeline.
+
+### In-memory aggregation (documented non-goal, but a real limit)
+
+- Problem: The engine materializes every enriched row and every group node in memory (`encino_rpt/aggregation.py:134-163` enrichment, `:189-234` partitioning). No spill-to-disk, no streaming input. For very large inputs (> hundreds of thousands of rows) memory grows linearly with row count × columns.
+- Files: `encino_rpt/aggregation.py`, `encino_rpt/readers.py` (readers also return full `list[dict]`).
+- Cause: Documented design non-goal — heavy aggregates are delegated to SQL `ROLLUP`/`CUBE` (`AGENTS.md`).
+- Improvement path: Accepted as-is. Only the smoke test (`tests/test_perf_smoke.py`, 50k rows) bounds behavior; larger inputs are the caller's responsibility.
 
 ---
 
 ## Fragile Areas
 
-**Grouping and pivoting assume hashable keys:**
-- Files: `encino_rpt/aggregation.py:178-189`, `encino_rpt/pivot.py:16-34,49-56`
-- Why fragile: dict/set keying breaks on `list`/`dict` cell values with a bare `TypeError`; no validation, no context, no clear message. `count_distinct` (`encino_rpt/aggregation.py:63,82-83`) also builds a `set`, so unhashable values crash there too.
-- Safe modification: add up-front key-hashability validation (or normalization) before `_partition`/`build_pivot`/`count_distinct`.
-- Test coverage: `test_unhashable_group_value` asserts the `TypeError`; no test covers unhashable pivot/count_distinct paths.
+### `JsonRenderer.to_dict` depth-error detection is heuristic
 
-**Registry accumulation assumes numeric/None-safe addition:**
-- Files: `encino_rpt/aggregation.py:235`
-- Why fragile: `registry.get(key, 0) + val` crashes when a named total resolves to `None`; any new operator that can return `None` re-triggers this.
-- Safe modification: centralize registry accumulation behind a helper that treats `None` as `0` (or skips registration), then reuse in both base-total and deferred paths.
+- Files: `encino_rpt/renderers/json.py:58-60` (`_is_depth_error` matches on the substrings `"depth"`, `"circular"`, `"recursi"` in the exception message).
+- Why fragile: Matching on error-message text is brittle across pydantic/Python versions — a wording change in pydantic could cause the `RecursionError`→`ValueError` mapping to miss, or (worse) misclassify an unrelated `ValueError` as a depth error.
+- Safe modification: Prefer explicit `except RecursionError` (already the primary path at line 49) and treat the message-substring heuristic as a fallback; add a regression for a genuinely non-serializable value (already covered by `tests/test_report_renderers.py:451-460`, MA-01).
 
-**chart/pivot construction outside the `_wrap` context path:**
-- Files: `encino_rpt/aggregation.py:352-368`
-- Why fragile: unlike totals (`_compute_totals_into` wraps every `_value_for`, `encino_rpt/aggregation.py:221-230`), chart/pivot value functions are invoked raw, so failures lose group/field context. Adding new chart/pivot operators inherits the same gap.
-- Safe modification: route chart/pivot `fn(...)` through `_wrap` with an explicit context string.
-- Test coverage: `test_chart_pivot_error_context` is `xfail` (documents the gap).
+### `charts.py` `label_field` and no-children chart path
+
+- Files: `encino_rpt/charts.py:22-23` (the `else` branch deriving labels from `own_totals`), `:39-46` (`_label` when `label_field` is set).
+- Why fragile: These two branches have no test coverage (`charts.py` is at 68%; lines 22-23, 39-41, 44-46 are missed). A chart declared on a leaf group (no children) or using `label_field` could silently produce wrong labels.
+- Safe modification: Add tests for (a) a chart on a group with no sub-groups (totals-derived labels) and (b) `label_field` pointing at a key vs. first row.
+
+### Renderer event handlers for `chart`/`pivot` in CSV/Text/Markdown/PDF
+
+- Files: `encino_rpt/renderers/csv.py:100-116`, `text.py:82-94`, `markdown.py:135-148`, `pdf.py:118-128`.
+- Why fragile: These are the least-covered renderer paths (CSV 81%, Text 69%, Markdown 68%, PDF 75%). Chart/pivot rendering to non-HTML/Excel formats is thin and under-tested.
+- Safe modification: Add cross-format golden tests asserting chart/pivot output shape in CSV, Text, Markdown, and PDF.
 
 ---
 
 ## Scaling Limits
 
-**JSON depth ceiling:**
-- Current capacity: path hierarchies up to ~1000 levels serialize to JSON; beyond that `to_json()` raises `ValueError` (see Known Bugs). HTML/CSV/text/Excel have no such limit (iterative `walk`/path builder).
-- Limit: pydantic-core recursion depth for recursive models.
-- Scaling path: iterative JSON serialization or a documented depth cap.
+### JSON serialization depth
 
-**In-memory footprint:**
-- Current capacity: all datasets + enriched copies held in memory simultaneously (`encino_rpt/aggregation.py:543-545`). Smoke test at 50k rows passes (<10s, `tests/test_perf_smoke.py:11-31`).
-- Limit: linear in rows × columns; large financial extracts exhaust RAM rather than degrade gracefully.
-- Scaling path: documented non-goal — aggregate server-side (SQL), feed `Report` already-materialized slices.
+- Current capacity: ~1000 levels of `path=` nesting serialize fine; beyond that `to_json()` raises `ValueError("la jerarquía es demasiado profunda...")` (`encino_rpt/renderers/json.py:9-12`). Regression pins 1100 levels → error (`tests/test_report_renderers.py:436-448`).
+- Limit: pydantic recursion depth (no configurable bound exposed).
+- Scaling path: Iterative JSON serializer, or a documented max-depth constant with an early, cheap pre-flight check in `ReportResult.to_json`.
+
+### Pivot/group cardinality
+
+- Current capacity: 50k rows × 50×200 pivot dimensions passes the smoke gate in <10s (`tests/test_perf_smoke.py`).
+- Limit: `_partition` (`encino_rpt/aggregation.py:189-212`) and `build_pivot` (`encino_rpt/pivot.py`) are O(rows) single-pass; memory is the binding constraint for very high cardinality, not algorithmic cost.
+- Scaling path: SQL-side pre-aggregation (documented non-goal).
 
 ---
 
 ## Dependencies at Risk
 
-**pydantic (runtime-only dependency, unpinned upper bound):**
-- Risk: `pyproject.toml:33` declares `pydantic>=2` with no upper bound. The model layer relies on pydantic-v2-specific behavior — `Group.model_rebuild()` for the recursive union (`encino_rpt/models.py:232`), `PrivateAttr` for non-serialized context (`encino_rpt/models.py:124-126`), and `model_dump(mode="json")`.
-- Impact: A future pydantic 3.x could change recursive-model serialization or `PrivateAttr`, silently breaking `to_json()`/`run()`.
-- Migration plan: pin a `<3` (or otherwise tested) upper bound in `pyproject.toml`, and add a CI job against the latest allowed pydantic.
+### `pydantic>=2,<3`
 
-**Dev-tooling lower bounds only:**
-- Risk: `pyproject.toml:49-56` declares `pytest>=9.1.1`, `ruff>=0.16.7`, `mypy>=2.3.1`, `pytest-cov>=7.1.0` with no upper bounds. Exact versions are pinned only in `uv.lock`.
-- Impact: If `uv.lock` is regenerated, a newer mypy/ruff could emit new errors and break the `quality` gate (`ci.yml:46-53`).
-- Migration plan: keep `uv.lock` committed and regenerated deliberately; consider upper bounds or a scheduled dependency refresh.
+- Risk: Low. Upper bound is present (`pyproject.toml:33`), preventing a breaking v3 upgrade from silently entering. The `Group.model_rebuild()` forward-reference resolution (`encino_rpt/models.py:368`) and `PrivateAttr` usage are the two pydantic-v2 APIs the model layer depends on.
+- Impact: A pydantic minor bump could change recursive-serialization depth behavior (see deep-tree concern).
+- Migration plan: Periodically bump within `<3` and re-run the deep-tree + round-trip tests (`tests/test_report_renderers.py:436-460`, `tests/test_report.py`).
 
-**Optional extras unpinned:**
-- Risk: `pyproject.toml:37-38` declares `excel = ["openpyxl"]` and `pdf = ["reportlab"]` with no version constraints.
-- Impact: `openpyxl`/`reportlab` APIs used by `encino_rpt/renderers/excel.py` and `encino_rpt/renderers/pdf.py` could change on a minor bump.
-- Migration plan: pin tested minimums in the extras (or rely on `uv.lock` + periodic smoke tests).
+### `openpyxl>=3.1.5` and `reportlab>=5.0.1` (extras, lower-bound only)
+
+- Risk: No upper pin on either optional dependency (`pyproject.toml:37-38`). A future major bump in `openpyxl`/`reportlab` could break the lazy-import renderers, but is outside the CI matrix until a consumer opts into the extra.
+- Impact: Optional renderers (`ExcelRenderer`, `PdfRenderer`) are the first to break on a transitive major upgrade; they are also the lowest-coverage renderers (Excel 66%, PDF 75%).
+- Migration plan: Pin upper bounds (e.g., `<4` for openpyxl, `<6` for reportlab) or add an extra CI job installing the extras to exercise `excel.py`/`pdf.py` against pinned versions.
 
 ---
 
 ## Missing Critical Features
 
-**No server-side chart image rendering:**
-- Problem: `chart` degrades to a summary table/string in every renderer except Excel (native charts in `encino_rpt/renderers/excel.py:215-249`). HTML/CSV/text/PDF emit a text summary only.
-- Blocks: true graphical charts in HTML/PDF outputs. Explicitly deferred (v2 / `CHART-01`, matplotlib) in `.planning/REQUIREMENTS.md:61`.
+### No depth bound is enforced at build time (only at JSON serialization)
 
-**`column_position` is honored only in Excel totals:**
-- Problem: `Total.column_position` is applied in Excel (`encino_rpt/renderers/excel.py:109-113`) but ignored by HTML/CSV/text/PDF; footer `column_position` is ignored everywhere (see Tech Debt).
-- Blocks: aligned totals/footers in non-Excel outputs.
+- Problem: A `path=` group with an extreme depth builds a tree successfully and renders via all iterative renderers, but only fails when the user calls `to_json()`. The failure is discovered late, at a different layer than where the offending input was declared.
+- Blocks: Predictable behavior for pathological `path` inputs; users cannot know in advance that JSON export will fail.
+- Suggestion: Expose/document a max depth constant and validate (or warn) at `Report.run()` time.
+
+### `column_position` only affects Excel (see Tech Debt)
+
+- Problem: The alignment hint is silently ignored by five of six renderers.
+- Blocks: Consistent presentation across output formats for reports that use column-positioned totals.
 
 ---
 
 ## Test Coverage Gaps
 
-Coverage gate is `fail_under=80` with `branch = false` (`pyproject.toml:81-88`); branch coverage is off, so conditional paths in `_apply_order`/`_is_zero`/`_sort_key` are not measured. Specific untested paths:
+Overall coverage is 84% (above the 80% CI gate at `.github/workflows/ci.yml:53`), but several renderers are well below it and are not individually gated:
 
-**Excel native chart/pivot rendering:**
-- What's not tested: `ExcelRenderer._chart` (`encino_rpt/renderers/excel.py:215-249`) and `ExcelRenderer._pivot` (`excel.py:251-265`) have no test asserting a native chart/pivot was actually added.
-- Files: `encino_rpt/renderers/excel.py:215-265`
-- Risk: chart/pivot output silently breaking.
-- Priority: Medium.
+| Module | Coverage | Untested functionality |
+|--------|----------|-------------------------|
+| `encino_rpt/renderers/excel.py` | **66%** | KPIs (`:58-63`), chart (`:212-245`), pivot (`:248-261`), conditional formatting (`:200-209`), `_sum_formula` gaps (`:150`) |
+| `encino_rpt/renderers/markdown.py` | **68%** | `write`/`iter` join logic (`:87-90`), pivot table (`:103-110`), chart/footer lines (`:132,135-148`) |
+| `encino_rpt/renderers/text.py` | **69%** | `write`/`iter` (`:46-49`), chart/pivot lines (`:75,82-94`) |
+| `encino_rpt/renderers/pdf.py` | **75%** | KPI/title (`:58,60`), chart/pivot/span logic (`:99,110,118-128`), `_pivot_table` (`:149-162`) |
+| `encino_rpt/charts.py` | **68%** | no-children branch (`:22-23`), `label_field` (`:39-41,44-46`) |
+| `encino_rpt/renderers/csv.py` | **81%** | chart/pivot serialization (`:100-113`) |
+| `encino_rpt/renderers/_walk.py` | **79%** | Chart/Pivot event branches (`:28-31`) |
+| `encino_rpt/readers.py` | **84%** | error paths: bad source type, raw `str`/`bytes` file-likes, `coerce` `float("nan")` guard, extension-less format |
 
-**`_format` edge cases:**
-- What's not tested: `format_value` for `kind="date"`, boolean values, and `excel_number_format` for `date`, non-scaled `percent`, and `symbol_position="suffix"`.
-- Files: `encino_rpt/renderers/_format.py:9-76`
-- Risk: date/suffix formatting regressions.
-- Priority: Low.
+Priority:
 
-**Multi-dataset KPI / field / chart / pivot sources:**
-- What's not tested: `kpi(source=...)` (`encino_rpt/aggregation.py:486-504`), `add_field(source=...)` (`aggregation.py:130`), and the (dead) `chart(source=...)`/`pivot(source=...)` paths.
-- Files: `encino_rpt/aggregation.py:486-504,123-152`
-- Risk: the `source` plumbing for KPIs/fields is untested; dead chart/pivot source paths are unexercised.
-- Priority: Medium.
-
-**`order_by(column=...)` on `Detail` and `_sort_key` fallthrough:**
-- What's not tested: ordering detail children by column (`encino_rpt/aggregation.py:416-421`) and the `return 0` fallback (`aggregation.py:425`).
-- Files: `encino_rpt/aggregation.py:396-425`
-- Risk: detail ordering regressions.
-- Priority: Low.
-
-**PDF chart/pivot and repeat-header paths:**
-- What's not tested: `PdfRenderer` chart/pivot rendering and `repeat_header=False` (`encino_rpt/renderers/pdf.py:88-122,75`).
-- Files: `encino_rpt/renderers/pdf.py`
-- Risk: PDF layout regressions.
-- Priority: Low.
-
----
-
-## CI / Infrastructure
-
-**Pre-existing GitHub Pages `configure-pages` failure (docs.yml):**
-- Issue: The `Docs` workflow's `actions/configure-pages@v5` step fails (runs 3–7 in `failure`) while the `Build docs` (`uv run mkdocs build`) step passes. Registered in git history (commit `305a03d`). Not caused by, and does not block, the `test`+`quality` CI (which is green).
-- Files: `.github/workflows/docs.yml:34` (`configure-pages@v5`), `.github/workflows/docs.yml:7-10` (permissions `pages: write`, `id-token: write`)
-- Impact: Docs do not deploy to GitHub Pages (`https://hvalles.github.io/encino_rpt/`).
-- Fix approach: Review GitHub Pages source/permissions in repo settings or adjust the workflow (e.g. `enablement`/`source` config for the Pages environment), then re-run.
+- **High:** `charts.py` `label_field` + no-children chart (silent wrong-label risk, `:22-23,39-46`).
+- **High:** Excel chart/pivot + conditional formatting (`:200-261`) — the richest, least-tested renderer paths.
+- **Medium:** `_walk.py` Chart/Pivot branches and CSV/Text/Markdown/PDF chart/pivot serialization (cross-format consistency).
+- **Medium:** `readers.py` error paths (`:119-127,143-154,207-211,239-242,269,308,347`) — invalid source types and `coerce` edge cases.
+- **Low:** `write`/`iter_*` streaming wrappers in text/markdown (already parity-checked by `test_iter_*_matches_render` in `tests/test_report_renderers.py:488-514`).
 
 ---
 

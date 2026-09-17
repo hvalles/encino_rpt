@@ -5,55 +5,53 @@
 ## Languages
 
 **Primary:**
-- Python `>=3.10` — the entire library is pure Python. Declared via `requires-python = ">=3.10"` in `pyproject.toml:13`. Classifiers declare support for 3.10–3.13 (`pyproject.toml:25-28`). No compiled extensions.
+- Python `>=3.10` — the entire library is pure Python. Declared via `requires-python = ">=3.10"` in `pyproject.toml:13`. Classifiers declare support for 3.10–3.13 (`pyproject.toml:24-28`). No compiled extensions, no C/Rust wheels.
 
 **Secondary:**
-- None detected. No TypeScript/JS, no templated files. HTML output is generated as strings inside `encino_rpt/renderers/html.py`. Markdown is used only for docs (`docs/*.md`).
+- None detected. No TypeScript/JS, no templated files. HTML/Markdown/CSV/JSON/text output is generated as strings inside `encino_rpt/renderers/`. Markdown is used only for docs (`docs/*.md`).
 
 ## Runtime
 
 **Environment:**
-- CPython only. This is a **library**, not an application/server — no server runtime, no web framework, no worker process. Local dev venv at `.venv/` (gitignored). CI runs on `ubuntu-latest`.
+- CPython only. This is a **library**, not an application/server — no server runtime, no web framework, no worker process, no async loop. Local dev venv at `.venv/` (gitignored via `.gitignore:2`). CI runs on `ubuntu-latest`.
 
 **Package Manager:**
-- `uv` (Astral). Lockfile `uv.lock` (lockfile version 1) at repo root. All dependency versions are pinned there. No `requirements.txt`, `pyproject`-only.
-- Lockfile: present (`uv.lock`, ~338 KB).
+- `uv` (Astral). Lockfile `uv.lock` (lockfile version 1, ~338 KB) at repo root. All dependency versions are pinned there. No `requirements.txt` — `pyproject.toml`-only.
+- Lockfile: present (`uv.lock`).
 
 ## Frameworks
 
 **Core:**
-- **pydantic** `2.13.5` (`pydantic-core` `2.46.5`) — canonical report data model (`ReportResult`, `Group`, `Total`, `Chart`, `Pivot`, `Kpi`, etc.) in `encino_rpt/models.py`. Declared `pydantic>=2` in `pyproject.toml:33` — the **only** runtime dependency. Used for validation and JSON serialization (`model_dump(mode="json")` in `encino_rpt/renderers/json.py:27`).
+- **pydantic** `2.13.5` (`pydantic-core` `2.46.5`) — canonical report data model (`ReportResult`, `Group`, `Total`, `Chart`, `Pivot`, `Kpi`, `Detail`, `Format`, `Link`, `Image`, `ConditionalRule`, `Series`, `ReportMeta`) in `encino_rpt/models.py`. Declared `pydantic>=2,<3` in `pyproject.toml:32-34` — the **only** runtime dependency. Used for validation and JSON serialization (`model_dump(mode="json")` in `encino_rpt/renderers/json.py:48`). The recursive `Group.children` union is resolved with `Group.model_rebuild()` (`encino_rpt/models.py:368`).
 
 **Testing:**
-- **pytest** `9.1.1` — dev group (`pyproject.toml:50`, `pytest>=9.1.1`). Config `[tool.pytest.ini_options]` with `testpaths = ["tests"]`, `pythonpath = ["."]` (`pyproject.toml:44-46`).
-- **pytest-cov** `7.1.0` — dev group (`pyproject.toml:55`). Backed by **coverage** `7.16.1` (transitive). Enforced in the CI `quality` job via `--cov-fail-under=80` (`.github/workflows/ci.yml:53`).
-
-**Type Checking:**
-- **mypy** `2.3.1` — dev group (`pyproject.toml:54`). Config `[tool.mypy]` (`pyproject.toml:63-71`): `plugins = ["pydantic.mypy"]`, `python_version = "3.10"`, `check_untyped_defs`, `warn_unused_ignores`, `warn_redundant_casts`, `no_implicit_optional`, and `disable_error_code = ["import-untyped"]` (openpyxl/reportlab have no typed stubs).
+- **pytest** `9.1.1` — dev group (`pyproject.toml:50`). Config `[tool.pytest.ini_options]` with `testpaths = ["tests"]`, `pythonpath = ["."]` (`pyproject.toml:44-46`).
+- **pytest-cov** `7.1.0` — dev group (`pyproject.toml:55`). Backed by **coverage** `7.16.1` (transitive). Coverage config now in `[tool.coverage.run]`/`[tool.coverage.report]` (`pyproject.toml:81-88`) and enforced in CI via `--cov-fail-under=80` (`.github/workflows/ci.yml:53`).
 
 **Build/Dev:**
 - **hatchling** — build backend declared in `[build-system]` (`pyproject.toml:1-3`). Wheel packages `["encino_rpt"]` (`pyproject.toml:6`). Not version-pinned in `uv.lock` (build backend, not a project dependency).
-- **ruff** `0.16.7` — linter + formatter, dev group (`pyproject.toml:53`). Config now present: `[tool.ruff]` (`pyproject.toml:73-76`) sets `target-version = "py310"`, `line-length = 88`, `extend-exclude = [".planning", "docs", "dist", "build", ".venv"]`; `[tool.ruff.format]` (`pyproject.toml:78-79`) sets `quote-style = "double"`.
-- **mkdocs** `1.6.1` + **mkdocs-material** `9.7.7` + **mkdocstrings** `1.0.6` — docs toolchain (docs group, `pyproject.toml:58-60`), configured in `mkdocs.yml`.
+- **mypy** `2.3.1` — dev group (`pyproject.toml:54`). Config `[tool.mypy]` (`pyproject.toml:63-71`): `plugins = ["pydantic.mypy"]`, `python_version = "3.10"`, `check_untyped_defs`, `warn_unused_ignores`, `warn_redundant_casts`, `no_implicit_optional`, and `disable_error_code = ["import-untyped"]` (openpyxl/reportlab have no typed stubs).
+- **ruff** `0.16.7` — linter + formatter, dev group (`pyproject.toml:53`). `[tool.ruff]` (`pyproject.toml:73-76`) sets `target-version = "py310"`, `line-length = 88`, `extend-exclude = [".planning", "docs", "dist", "build", ".venv"]`; `[tool.ruff.format]` (`pyproject.toml:78-79`) sets `quote-style = "double"`.
+- **mkdocs** `1.6.1` + **mkdocs-material** `9.7.7` + **mkdocstrings** `1.0.6` — docs toolchain (docs group, `pyproject.toml:57-61`), configured in `mkdocs.yml`.
 
 ## Key Dependencies
 
 **Critical:**
-- **pydantic** `2.13.5` — the entire data model in `encino_rpt/models.py` is pydantic v2 (`BaseModel`, `Field`, `PrivateAttr`, `Literal`). The recursive `Group.children` reference is resolved with `Group.model_rebuild()` (`encino_rpt/models.py:232`). Removing it would require rewriting the model layer.
+- **pydantic** `2.13.5` — the entire data model in `encino_rpt/models.py` is pydantic v2 (`BaseModel`, `Field`, `PrivateAttr`, `Literal`). Removing it would require rewriting the model layer and every renderer.
 
-**Optional extras (file-format writers, not network services):**
-- **openpyxl** `3.1.5` — optional extra `excel` (`pyproject.toml:37`). Imported lazily inside `ExcelRenderer.render` (`encino_rpt/renderers/excel.py`). Raises `ImportError` with a Spanish hint to install `encino-rpt[excel]` when missing.
+**Infrastructure (optional extras):**
+- **openpyxl** `3.1.5` — optional extra `excel` (`pyproject.toml:37`). Imported lazily inside `ExcelRenderer.render` (`encino_rpt/renderers/excel.py`) and `ExcelReader.read` (`encino_rpt/readers.py:296`). Raises `ImportError` with a Spanish hint to install `encino-rpt[excel]` when missing.
 - **reportlab** `5.0.1` — optional extra `pdf` (`pyproject.toml:38`). Imported lazily inside `PdfRenderer.render` (`encino_rpt/renderers/pdf.py`). Same guarded-import pattern.
 
-**Docs toolchain (transitive, not imported by the library):**
+**Transitive (never imported by `encino_rpt/`):**
 - **pillow** `12.3.0` — pulled in by mkdocs-material.
-- **requests** / **urllib3** / **certifi** / **idna** / **charset-normalizer** — transitive deps of mkdocs (ghp-import). Never imported by `encino_rpt/` (verified: no network imports anywhere in the package).
+- **requests** / **urllib3** / **certifi** / **idna** / **charset-normalizer** — transitive deps of mkdocs (ghp-import). Verified: no network imports anywhere in the package.
 - **jinja2** / **markdown** / **pygments** / **pymdown-extensions** / **babel** — mkdocs/mkdocs-material transitive deps.
 
 ## Configuration
 
 **Environment:**
-- No `.env`, `.env.*`, or env-var-driven config detected. The library is pure and stateless — no runtime environment variables required. `.env` is listed in `.gitignore:23` but no such file exists. Secrets for publishing live only in GitHub Actions (`TEST_PYPI_API_TOKEN`, `PYPI_API_TOKEN`).
+- No `.env`, `.env.*`, or env-var-driven config detected. The library is pure and stateless — no runtime environment variables required. `.env` is listed in `.gitignore:23` but no such file exists.
 
 **Build:**
 - `pyproject.toml` — hatchling build config, project metadata, dependency groups, and tool configs for pytest/mypy/ruff/coverage.

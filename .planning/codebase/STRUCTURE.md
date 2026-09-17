@@ -5,164 +5,177 @@
 ## Directory Layout
 
 ```
-report/                          # repo root (encino-rpt)
-├── encino_rpt/                  # Library package (pure Python, pydantic only)
-│   ├── __init__.py              # Public re-exports (14 names)
-│   ├── report.py                # Report fluent builder
-│   ├── section.py               # Section facade (mutates GroupSpec)
-│   ├── _specs.py                # Internal *Spec dataclasses (not in output tree)
-│   ├── aggregation.py           # Engine: enrich → group tree → totals → ReportResult
-│   ├── expressions.py           # Safe AST-whitelist expression evaluator
-│   ├── template.py              # {{token}} template interpolation
-│   ├── charts.py                # Chart labels/series derivation
-│   ├── pivot.py                 # Cross-tab Pivot builder
-│   ├── models.py                # Pydantic v2 canonical data model
-│   └── renderers/               # Visitor-style output renderers
-│       ├── __init__.py          # Renderer re-exports
-│       ├── _walk.py             # Shared iterative tree traversal (walk generator)
-│       ├── _format.py           # Value/number formatting per Format
-│       ├── _sanitize.py         # OWASP formula-injection mitigation
-│       ├── html.py              # HTML table renderer
-│       ├── excel.py             # openpyxl renderer (optional extra)
-│       ├── csv.py               # CSV renderer
-│       ├── text.py              # Plain-text renderer
-│       ├── pdf.py               # reportlab renderer (optional extra)
-│       └── json.py              # JSON renderer (schema_version)
-├── tests/                       # pytest suite (co-located by area)
-│   ├── test_report.py           # Builder + engine round-trip
-│   ├── test_report_renderers.py # Renderer output assertions
-│   ├── test_security.py         # Expression sanitization + formula injection
-│   └── test_perf_smoke.py       # 50k-row wall-clock smoke test
-├── docs/                        # mkdocs source (Spanish)
-│   ├── index.md / getting-started.md / guide.md / api.md / security.md
-│   └── design/                  # 10-report.md design notes
-├── .github/workflows/           # ci.yml, docs.yml, publish.yml
-├── .planning/                   # GSD planning artifacts (codebase/, phases/, ROADMAP.md, STATE.md…)
-├── prompts/                     # Internal notes (gitignored, not distributed)
-├── dist/                        # Build artifacts (gitignored; version 0.2.0)
-├── site/                        # Built mkdocs site (gitignored)
-├── .venv/                       # Local virtualenv (gitignored)
-├── .mypy_cache/ .pytest_cache/ .ruff_cache/   # Tool caches (gitignored)
-├── pyproject.toml               # hatchling build + project metadata + tool config
-├── uv.lock                      # Pinned dependency lockfile (uv)
-├── mkdocs.yml                   # Docs site config (material theme, es)
-├── README.md                    # Package overview + usage examples
-├── LICENSE                      # MIT
-└── AGENTS.md                    # GSD project context (generated)
+report/                            # repo root (encino-rpt)
+├── encino_rpt/                    # the library package (published as `encino-rpt`)
+│   ├── __init__.py                # public API re-exports (15 names)
+│   ├── report.py                  # fluent `Report` builder + read()/register_reader()
+│   ├── section.py                 # `Section` facade (mutates a GroupSpec)
+│   ├── readers.py                 # multi-format input readers (Reader protocol + registry)
+│   ├── aggregation.py             # aggregation engine (enrich/group/totals/templates/KPIs)
+│   ├── expressions.py             # safe AST expression evaluator (no eval)
+│   ├── template.py                # `{{token}}` interpolation
+│   ├── charts.py                  # Chart label/series derivation
+│   ├── pivot.py                   # Pivot cross-tab builder
+│   ├── models.py                  # pydantic canonical tree (13 models)
+│   ├── _specs.py                  # internal builder dataclasses (FieldSpec/GroupSpec/...)
+│   └── renderers/                 # output renderers (visitor pattern)
+│       ├── __init__.py            # exports the 7 renderer classes
+│       ├── _walk.py               # shared iterative traversal (single source of truth)
+│       ├── _format.py             # format_value / excel_number_format
+│       ├── _sanitize.py           # OWASP formula-injection mitigation
+│       ├── html.py                # HtmlRenderer
+│       ├── excel.py               # ExcelRenderer (openpyxl, optional)
+│       ├── csv.py                 # CsvRenderer
+│       ├── text.py                # TextRenderer
+│       ├── pdf.py                 # PdfRenderer (reportlab, optional)
+│       ├── json.py                # JsonRenderer (schema_version)
+│       └── markdown.py            # MarkdownRenderer (GFM tables)
+├── tests/                         # pytest suite (5 files, ~1480 lines)
+│   ├── test_report.py             # builder + model round-trip
+│   ├── test_report_renderers.py   # renderer output
+│   ├── test_readers.py            # multi-format readers
+│   ├── test_security.py           # expression + formula-injection safety
+│   └── test_perf_smoke.py         # performance smoke tests
+├── docs/                          # mkdocs source (Spanish), includes design/ subdir
+├── .github/workflows/             # ci.yml, docs.yml, publish.yml
+├── dist/                          # built wheel/sdist (gitignored, version 0.2.0)
+├── site/                          # built mkdocs site (gitignored)
+├── .planning/                     # GSD planning artifacts (codebase/ lives here)
+├── pyproject.toml                 # hatchling build + tool configs (pytest/mypy/ruff/coverage)
+├── mkdocs.yml                     # docs config
+├── uv.lock                        # uv lockfile (all deps pinned)
+├── AGENTS.md                      # project context (GSD-generated)
+├── README.md
+└── LICENSE
 ```
 
 ## Directory Purposes
 
-**`encino_rpt/`:**
-- Purpose: The entire library. Pure Python, single runtime dependency (`pydantic>=2`).
-- Contains: Builder (`report.py`, `section.py`), internal specs (`_specs.py`), engine (`aggregation.py`), helpers (`expressions.py`, `template.py`, `charts.py`, `pivot.py`), canonical model (`models.py`), and the `renderers/` subpackage.
-- Key files: `encino_rpt/report.py`, `encino_rpt/aggregation.py`, `encino_rpt/models.py`.
+**`encino_rpt/` (package root):**
+- Purpose: The entire public library. Pure Python, no server, no compiled extensions.
+- Contains: Builder, engine, models, readers, and renderers.
+- Key files: `report.py`, `aggregation.py`, `models.py`, `readers.py`, `__init__.py`.
 
 **`encino_rpt/renderers/`:**
-- Purpose: Convert the canonical `ReportResult` tree to concrete output formats (HTML, Excel, CSV, text, PDF, JSON).
-- Contains: Six `*Renderer` classes + three shared helpers (`_walk.py`, `_format.py`, `_sanitize.py`).
-- Key files: `encino_rpt/renderers/_walk.py` (the single traversal), `encino_rpt/renderers/excel.py` (largest, optional `openpyxl`).
+- Purpose: Convert the canonical tree to concrete output formats (visitor pattern).
+- Contains: 7 renderer classes + 3 shared helpers (`_walk.py`, `_format.py`, `_sanitize.py`).
+- Key files: `_walk.py` (shared traversal), `html.py`, `excel.py`, `csv.py`, `text.py`, `pdf.py`, `json.py`, `markdown.py`.
 
 **`tests/`:**
-- Purpose: pytest suite; mirrors the library by area (engine, renderers, security, performance).
-- Contains: `test_report.py`, `test_report_renderers.py`, `test_security.py`, `test_perf_smoke.py`.
-- Key files: `tests/test_report.py` (555 lines), `tests/test_report_renderers.py` (357 lines).
+- Purpose: pytest suite covering builder/model round-trip, renderers, readers, security, and performance.
+- Contains: `test_*.py` modules, one per area.
+- Key files: `test_report.py`, `test_report_renderers.py`, `test_readers.py`, `test_security.py`.
 
 **`docs/`:**
-- Purpose: mkdocs source documentation (Spanish), published to GitHub Pages.
-- Contains: `index.md`, `getting-started.md`, `guide.md`, `api.md`, `security.md`, plus `docs/design/10-report.md` (design notes).
-- Key files: `docs/api.md` (API reference via mkdocstrings), `docs/design/10-report.md`.
+- Purpose: mkdocs source (Spanish) with `getting-started.md`, `guide.md`, `api.md`, `security.md`, and a `design/` subdirectory.
+- Contains: Markdown documentation and mkdocstrings references.
+- Key files: `index.md`, `api.md`.
 
 **`.github/workflows/`:**
-- Purpose: CI (`ci.yml` — test + lint + mypy), docs deploy (`docs.yml`), PyPI publish (`publish.yml`).
-- Key files: `.github/workflows/ci.yml`, `.github/workflows/publish.yml`.
+- Purpose: CI (`ci.yml`), docs deployment (`docs.yml`), and package publishing (`publish.yml`).
+- Contains: GitHub Actions workflow YAML.
+- Key files: `ci.yml`.
 
 **`.planning/`:**
-- Purpose: GSD planning state (roadmap, requirements, strategy, phase plans, codebase map).
-- Contains: `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `STRATEGY.md`, `config.json`, `codebase/`, `phases/`.
+- Purpose: GSD planning artifacts (roadmap, state, strategy, and `codebase/` maps).
+- Contains: Markdown planning docs; `codebase/` holds the architecture/stack/convention maps.
+- Key files: `codebase/ARCHITECTURE.md`, `codebase/STRUCTURE.md`.
 
 ## Key File Locations
 
 **Entry Points:**
-- `encino_rpt/__init__.py`: Public API surface — re-exports `Report` + 13 model types (`__all__` at lines 20–34).
-- `encino_rpt/report.py:361-369`: `Report.run()` — the single engine invocation point.
-- `encino_rpt/models.py:150-229`: `ReportResult.render_html`/`to_csv`/`to_text`/`to_excel`/`to_json`/`to_pdf` — renderer entry points.
+- `encino_rpt/__init__.py`: public API — re-exports 15 names (`Report`, `ReportResult`, all model types, `Reader`).
+- `encino_rpt/report.py`: `Report.run()` (materialize), `Report.read()` / `Report.register_reader()` (input).
+- `encino_rpt/readers.py`: `read()` function (dispatch by format/extension).
+- `encino_rpt/models.py`: `ReportResult.to_*`/`render_*`/`iter_*` convenience methods.
 
 **Configuration:**
-- `pyproject.toml`: hatchling build config, project metadata, optional extras (`excel`/`pdf`), dev/docs dependency groups, pytest/mypy/ruff/coverage tool config.
-- `mkdocs.yml`: docs site config (material theme, `language: es`, mkdocstrings Google-style, 5-page nav).
-- `.github/workflows/ci.yml`, `docs.yml`, `publish.yml`: CI/docs/publish pipelines.
+- `pyproject.toml`: hatchling build config, dependency groups, and `[tool.pytest.ini_options]`, `[tool.mypy]`, `[tool.ruff]`, `[tool.coverage]` sections.
+- `mkdocs.yml`: docs config.
+- `.github/workflows/ci.yml`: test (matrix 3.10–3.13) and quality (mypy/ruff/coverage) jobs.
 
 **Core Logic:**
-- `encino_rpt/aggregation.py`: `build()` orchestrates the whole engine (566 lines).
+- `encino_rpt/aggregation.py`: the engine — `build()` orchestrates enrichment, grouping, totals, templates, KPIs.
 - `encino_rpt/expressions.py`: `evaluate()` safe expression evaluator.
-- `encino_rpt/models.py`: canonical pydantic data model.
+- `encino_rpt/models.py`: canonical pydantic tree.
 
 **Testing:**
-- `tests/test_report.py`: engine + model round-trip tests.
-- `tests/test_report_renderers.py`: renderer output tests.
-- `tests/test_security.py`: security tests (expression whitelist, formula injection).
-- `tests/test_perf_smoke.py`: performance smoke test (50k rows, 10s wall-clock bound).
+- `tests/test_report.py`, `tests/test_report_renderers.py`, `tests/test_readers.py`, `tests/test_security.py`, `tests/test_perf_smoke.py`.
+
+**Docs:**
+- `docs/guide.md`, `docs/api.md`, `docs/security.md`, `docs/design/`.
 
 ## Naming Conventions
 
 **Files:**
-- `snake_case.py` for all modules: `report.py`, `section.py`, `aggregation.py`, `pivot.py`, `expressions.py`, `template.py`, `charts.py`, `models.py`.
-- Leading-underscore for internal modules: `_specs.py`, `renderers/_walk.py`, `renderers/_format.py`, `renderers/_sanitize.py`.
-- Tests: `tests/test_<area>.py` — `test_report.py`, `test_report_renderers.py`, `test_security.py`, `test_perf_smoke.py`.
+- `snake_case.py` modules in the package root: `report.py`, `aggregation.py`, `expressions.py`, `readers.py`.
+- Leading underscore for internal/helper modules: `_specs.py`, `renderers/_walk.py`, `renderers/_format.py`, `renderers/_sanitize.py`.
+- Tests: `tests/test_<area>.py`.
 
 **Directories:**
-- Single package `encino_rpt/` with a `renderers/` subpackage for output format code; helpers live alongside the modules they serve (engine helpers are top-level modules, renderer helpers are underscore-prefixed in `renderers/`).
+- `renderers/` for output; `docs/` for mkdocs source; `.github/workflows/` for CI.
 
-**Symbols:**
-- Classes `PascalCase`: `Report`, `Section`, `ReportResult`, `Group`, `Detail`, `Total`, `Chart`, `Pivot`, `Kpi`, `Format`, `Link`, `Image`, `ConditionalRule`, `Series`, `ReportMeta`.
-- Renderers suffixed `Renderer`: `CsvRenderer`, `ExcelRenderer`, `HtmlRenderer`, `JsonRenderer`, `PdfRenderer`, `TextRenderer`.
+**Classes:**
+- `PascalCase`: `Report`, `Section`, `ReportResult`, `Group`, `Detail`, `Chart`, `Pivot`, `Kpi`, `Total`, `Format`, `Link`, `Image`, `ConditionalRule`, `Series`, `ReportMeta`, `Reader`.
+- Renderers suffixed `Renderer`: `CsvRenderer`, `ExcelRenderer`, `HtmlRenderer`, `JsonRenderer`, `MarkdownRenderer`, `PdfRenderer`, `TextRenderer`.
 - Internal spec dataclasses suffixed `Spec`: `FieldSpec`, `TotalSpec`, `ChartSpec`, `PivotSpec`, `KpiSpec`, `GroupSpec` (`encino_rpt/_specs.py`).
-- Functions/variables `snake_case`; private helpers prefixed `_`; module-level constants `UPPER_SNAKE` (e.g. `_MAX_NODES`, `SCHEMA_VERSION = "1.0"`).
+- Reader classes suffixed `Reader`: `JsonReader`, `JsonLinesReader`, `TuplesReader`, `ExcelReader`; base helper `_DelimitedReader` (internal, `_`-prefixed).
+
+**Functions:**
+- `snake_case`: `add_field`, `add_function`, `add_aggregate`, `build_chart`, `build_pivot`, `evaluate`, `render`, `build`, `read`, `register_reader`, `get_reader`, `format_value`, `sanitize_csv`, `walk`.
+- Private module-level helpers prefixed `_`: `_build_group_tree`, `_enrich`, `_partition`, `_compute_totals_into`, `_resolve_deferred`, `_apply_order`, `_coerce`, `_read_text`, `_resolve_format`.
 
 ## Where to Add New Code
 
-**New Feature (engine behavior):**
-- Primary code: `encino_rpt/aggregation.py` (or a new helper module imported by it, following the `charts.py`/`pivot.py` pattern).
-- Builder surface: add the fluent method to `encino_rpt/report.py` (or `encino_rpt/section.py` for group-scoped presentation), backing it with a field on the relevant `*Spec` in `encino_rpt/_specs.py`.
-- Canonical output: if the feature produces new tree data, add the model to `encino_rpt/models.py` and extend the `Group.children` union (`models.py:121`).
+**New Feature (builder capability):**
+- Primary code: add the fluent method to `encino_rpt/report.py`; if it needs spec state, add fields to the relevant dataclass in `encino_rpt/_specs.py`; add the aggregation logic in `encino_rpt/aggregation.py` (and register any validation in `_validate`).
+- Tests: `tests/test_report.py`.
 
-**New Renderer / output format:**
-- Implementation: new `encino_rpt/renderers/<name>.py` with a `*Renderer` class exposing `render(result)` that consumes `walk()` from `encino_rpt/renderers/_walk.py`.
-- Registration: import it in `encino_rpt/renderers/__init__.py` and add it to `__all__`; optionally add a `ReportResult` convenience method in `encino_rpt/models.py` (lazy import, matching the existing pattern).
-- Shared helpers: reuse `format_value`/`excel_number_format` (`_format.py`) and sanitization (`_sanitize.py`).
+**New Output Format (renderer):**
+- Implementation: create `encino_rpt/renderers/<name>.py` with a `<Name>Renderer` class that consumes `walk()` from `encino_rpt/renderers/_walk.py` and implements `render(result)` + `iter_*`/`write(result, file)`.
+- Register: add the import and name to `encino_rpt/renderers/__init__.py` (`__all__`).
+- Expose: add a `to_<name>()`/`iter_<name>()` convenience method to `ReportResult` in `encino_rpt/models.py`.
+- Tests: `tests/test_report_renderers.py`.
 
-**New Model Type:**
-- Implementation: `encino_rpt/models.py` (pydantic v2, `type: Literal[...]` discriminator); if recursive, call `model_rebuild()` at the bottom.
+**New Input Format (reader):**
+- Implementation: add a reader class in `encino_rpt/readers.py` (or a custom object with a `read(source, **opts) -> list[dict]` method), then `register_reader("name", reader)` at the bottom of `readers.py`. Add its extension to `_FORMAT_BY_EXT` (`readers.py:318-325`) if it should resolve by extension.
+- Registration: use `Report.register_reader(name, reader)` (`encino_rpt/report.py:80-90`) for user-level custom readers.
+- Tests: `tests/test_readers.py`.
+
+**New Canonical Model Type:**
+- Implementation: add the pydantic model to `encino_rpt/models.py`; if it is a child node type, add it to the `Group.children` union and re-run `Group.model_rebuild()`.
+- Tests: `tests/test_report.py`.
 
 **Utilities:**
-- Shared renderer helpers: `encino_rpt/renderers/_<name>.py` (underscore prefix).
-- Engine helpers: top-level module in `encino_rpt/` (e.g. `charts.py`, `pivot.py`).
-
-**Tests:**
-- Add to `tests/test_<area>.py`, or create `tests/test_<new_area>.py` following the existing naming.
+- Shared helpers live in the package root (`expressions.py`, `template.py`, `charts.py`, `pivot.py`) or `encino_rpt/renderers/_*.py` if renderer-specific.
+- Private/internal code goes in `_`-prefixed modules (`_specs.py`, `renderers/_walk.py`, `renderers/_format.py`, `renderers/_sanitize.py`).
 
 ## Special Directories
 
-**`site/`:**
-- Purpose: Built mkdocs HTML output (published to GitHub Pages).
-- Generated: Yes (`mkdocs build`).
-- Committed: No (`.gitignore:15`).
-
 **`dist/`:**
-- Purpose: Built wheel/sdist artifacts (`encino_rpt-0.2.0-py3-none-any.whl`, `encino_rpt-0.2.0.tar.gz`).
-- Generated: Yes (`uv build`).
-- Committed: No (`.gitignore:12`; also self-ignored via `dist/.gitignore`).
+- Purpose: Built wheel and sdist (`encino_rpt-0.2.0-*`).
+- Generated: Yes (via `uv build` in `.github/workflows/publish.yml`).
+- Committed: No (gitignored).
 
-**`prompts/`:**
-- Purpose: Internal dev notes (`24.md`, `25.md`, `analisys-10.md`).
-- Generated: No.
-- Committed: No (`.gitignore:28`).
+**`site/`:**
+- Purpose: Built mkdocs site output.
+- Generated: Yes (via `mkdocs build`).
+- Committed: No (gitignored).
 
-**`.venv/`, `.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`, `.coverage`:**
-- Purpose: Local environment and tool caches.
+**`.venv/`:**
+- Purpose: Local dev virtualenv (Windows; created by `uv`).
 - Generated: Yes.
-- Committed: No (`.gitignore:1-20`).
+- Committed: No (gitignored).
+
+**`.planning/`:**
+- Purpose: GSD planning artifacts, including this `codebase/` map.
+- Generated: Yes (by GSD commands).
+- Committed: Yes.
+
+**`.github/workflows/`:**
+- Purpose: CI, docs deploy, and publish pipelines.
+- Generated: No (hand-written).
+- Committed: Yes.
 
 ---
 
