@@ -40,6 +40,54 @@ class Report:
         self._datasets: dict[str, list[dict]] = {}
         self._kpis: list[KpiSpec] = []
 
+    @classmethod
+    def read(
+        cls,
+        source,
+        format: str | None = None,
+        *,
+        coerce: bool = True,
+        columns: list[str] | None = None,
+        params: list | None = None,
+        title: str | None = None,
+        **opts,
+    ) -> Report:
+        """Crea un `Report` leyendo una fuente multi-formato.
+
+        Delega en el módulo `readers` (CSV, TSV, JSON, JSONL, tuplas, Excel o
+        readers custom registrados). `Report(rows=...)` sigue intacto.
+
+        Args:
+            source: Ruta (`str`/`PathLike`), objeto file-like, o datos crudos.
+            format: Nombre del reader (`csv`, `tsv`, `json`, `jsonl`, `tuples`,
+                `excel`); `None` = resolver por la extensión del archivo.
+            coerce: Auto-detectar tipos por celda (int/float/bool/null);
+                `False` = todo `str`.
+            columns: Nombres de columna (requerido por el reader `tuples`).
+            params: Parámetros de la consulta (accesibles como `{{param.N}}`).
+            title: Título del reporte.
+            **opts: Opciones extra pasadas al reader.
+
+        Returns:
+            Un `Report` listo para declarar detalle/cortes y ejecutar `run()`.
+        """
+        from .readers import read as read_rows
+
+        rows = read_rows(source, format, coerce=coerce, columns=columns, **opts)
+        return cls(rows, params=params, title=title)
+
+    @classmethod
+    def register_reader(cls, name: str, reader) -> None:
+        """Registra un reader multi-formato para `Report.read`.
+
+        Args:
+            name: Nombre del reader.
+            reader: Objeto con método `read(source, **opts) -> list[dict]`.
+        """
+        from .readers import register_reader
+
+        register_reader(name, reader)
+
     # --- funciones / campos ---
     def add_function(self, name: str, fn) -> Report:
         """Registra una función de expresión (por renglón).

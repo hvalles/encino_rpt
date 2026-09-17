@@ -15,6 +15,7 @@ from .models import (
     Series,
     Total,
 )
+from .readers import Reader
 from .report import Report
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "Kpi",
     "Link",
     "Pivot",
+    "Reader",
     "Report",
     "ReportMeta",
     "ReportResult",
