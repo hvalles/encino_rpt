@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from .models import Pivot
 
 
@@ -16,9 +18,9 @@ def build_pivot(spec, rows, value_fn) -> Pivot:
     row_index = {v: i for i, v in enumerate(row_values)}
     col_index = {v: i for i, v in enumerate(col_values)}
 
-    buckets = {}
-    row_buckets = {}
-    col_buckets = {}
+    buckets: dict[tuple[Any, Any], list[Any]] = {}
+    row_buckets: dict[Any, list[Any]] = {}
+    col_buckets: dict[Any, list[Any]] = {}
     for r in rows:
         rv = r.get(spec.row_column)
         cv = r.get(spec.column_column)

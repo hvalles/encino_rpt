@@ -2,22 +2,29 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ._specs import GroupSpec
 from .charts import build_chart
 from .expressions import ExpressionError, evaluate
 from .models import (
+    Chart,
     Detail,
     Format,
     Group,
     Image,
     Kpi,
     Link,
+    Pivot,
     ReportMeta,
     ReportResult,
     Total,
 )
 from .pivot import build_pivot
 from .template import render as render_template
+
+# Unión de nodos que pueblan `Group.children` (detail, subgrupo, chart, pivot).
+Child = Detail | Group | Chart | Pivot
 
 
 class AggregationError(ValueError):
@@ -116,7 +123,7 @@ def _build_image(spec, row):
 def _enrich(report, source):
     rows = report._rows if source is None else report._datasets.get(source, [])
     out = []
-    cum = {}
+    cum: dict[str, Any] = {}
     for index, row in enumerate(rows):
         enriched = dict(row)
         for f in report._fields:
@@ -157,7 +164,7 @@ def _build_group_tree(report):
     if root is None:
         root = GroupSpec(name="global", columns=None)
 
-    children_map = {}
+    children_map: dict[str, list[GroupSpec]] = {}
     for name in report._order:
         s = specs[name]
         if s is root:
@@ -171,7 +178,7 @@ def _build_group_tree(report):
 def _partition(spec, rows):
     if spec.columns is None:
         return [(None, list(rows))]
-    index = {}
+    index: dict[tuple[Any, ...], list[Any]] = {}
     order = []
     for r in rows:
         key = tuple(r.get(c) for c in spec.columns)
@@ -290,7 +297,7 @@ def _make_path_node(report, spec, rows, registry, deferred, visible):
             stack.append(tnode.children[seg])
 
     for tnode, g in groups.items():
-        children = [
+        children: list[Child] = [
             Detail(row={k: v for k, v in r.items() if k in visible})
             for r in tnode.leaf_rows
         ]
@@ -343,7 +350,7 @@ def _build_instance(
     node.children = _apply_order(spec, node.children, report._functions)
 
     # charts y pivots al final
-    extras = []
+    extras: list[Child] = []
     for cs in spec.charts:
         fn = _make_value_fn(
             cs.operator, cs.column, cs.expression, report._functions, report._aggregates
@@ -538,8 +545,8 @@ def build(report) -> ReportResult:
         sources[name] = _enrich(report, name)
 
     root_spec, children_map = _build_group_tree(report)
-    registry = {}
-    deferred = []
+    registry: dict[str, Any] = {}
+    deferred: list[tuple[Total, Any, Any, str]] = []
     root_nodes = _build_group(
         report, root_spec, sources, registry, deferred, visible_set, children_map
     )

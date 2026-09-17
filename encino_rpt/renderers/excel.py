@@ -76,7 +76,7 @@ class ExcelRenderer:
 
     def _walk(self, root):
         ws = self._ws
-        group_stack = []
+        group_stack: list[list[int]] = []
 
         for event, node in walk(root):
             if event == "group_start":

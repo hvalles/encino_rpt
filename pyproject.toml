@@ -67,6 +67,8 @@ check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
+# openpyxl/reportlab son dependencias opcionales sin stubs tipados.
+disable_error_code = ["import-untyped"]
 
 [tool.ruff]
 target-version = "py310"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html as _html
 import io
+from typing import Any
 
 from ..models import Image, Link
 from ._format import format_value
@@ -59,8 +60,8 @@ class PdfRenderer:
                 )
             )
 
-        rows = []
-        spans = []
+        rows: list[list[Any]] = []
+        spans: list[tuple[int, int, int, int]] = []
         self._collect(result.root, result, rows, spans)
 
         if result.columns:

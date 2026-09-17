@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import operator
+from collections.abc import Callable
 from typing import Any
 
 _BINOPS = {
@@ -14,7 +15,7 @@ _BINOPS = {
     ast.Pow: operator.pow,
     ast.Mod: operator.mod,
 }
-_UNARY = {
+_UNARY: dict[type[ast.unaryop], Callable[[Any], Any]] = {
     ast.UAdd: operator.pos,
     ast.USub: operator.neg,
 }
@@ -91,11 +92,11 @@ def _walk(node, row: dict, functions: dict, depth: int = 0) -> Any:
         except (OverflowError, ZeroDivisionError) as exc:
             raise ExpressionError(f"error aritmético: {exc}") from exc
     if isinstance(node, ast.UnaryOp):
-        op = _UNARY.get(type(node.op))
-        if op is None:
+        uop = _UNARY.get(type(node.op))
+        if uop is None:
             raise ExpressionError(f"operador no permitido: {ast.dump(node)}")
         try:
-            return op(_walk(node.operand, row, functions, depth + 1))
+            return uop(_walk(node.operand, row, functions, depth + 1))
         except (OverflowError, ZeroDivisionError) as exc:
             raise ExpressionError(f"error aritmético: {exc}") from exc
     if isinstance(node, ast.Compare):
