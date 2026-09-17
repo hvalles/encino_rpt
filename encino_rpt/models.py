@@ -148,20 +148,39 @@ class ReportResult(BaseModel):
     root: Group
 
     def render_html(
-        self, classes: dict | None = None, repeat_header: bool = False
+        self,
+        classes: dict | None = None,
+        repeat_header: bool = False,
+        *,
+        css: bool = False,
+        template: bool = False,
+        title: str | None = None,
     ) -> str:
-        """Renderiza el reporte a una tabla HTML.
+        """Renderiza el reporte a una tabla HTML (o documento completo).
 
         Args:
             classes: Mapa de clases CSS por tipo de fila (`group`, `total`, ...).
-            repeat_header: Repetir el encabezado de columnas.
+            repeat_header: Repetir el encabezado de columnas por grupo.
+            css: Emitir el formato condicional como clases `rpt-cond-N` + bloque
+                `<style>` en vez de estilos `style="..."` inline (opt-in; el
+                comportamiento por defecto no cambia).
+            template: Envolver la tabla en un documento HTML completo
+                (`<!DOCTYPE html>`, `<head>`, `<body class="report">`). El bloque
+                `<style>` (si `css`) va dentro de `<head>`.
+            title: Título del documento (`<title>`); por defecto usa `meta.title`.
 
         Returns:
             El HTML como cadena.
         """
         from .renderers.html import HtmlRenderer
 
-        return HtmlRenderer(classes=classes, repeat_header=repeat_header).render(self)
+        return HtmlRenderer(
+            classes=classes,
+            repeat_header=repeat_header,
+            css=css,
+            template=template,
+            title=title,
+        ).render(self)
 
     def to_csv(self, delimiter: str = ",") -> str:
         """Renderiza el reporte a CSV (aplanado).

@@ -47,19 +47,31 @@ class HtmlRenderer:
             result: El `ReportResult` a renderizar.
 
         Returns:
-            La tabla HTML como cadena (o el documento completo si `template`).
+            La tabla HTML como cadena. Con `template=True`, el documento HTML
+            completo (`<!DOCTYPE html>`, `<head>`, `<body class="report">`); el
+            bloque `<style>` (si `css=True`) va dentro de `<head>`.
         """
-        parts = []
-        if self.css:
-            parts.append(_style_block(result))
-        parts.append("<table>")
+        parts = ["<table>"]
         if result.columns:
             header = "".join(f"<th>{_esc(c)}</th>" for c in result.columns)
             parts.append(f"<thead><tr>{header}</tr></thead>")
         parts.append("<tbody>")
         self._walk(result.root, result, parts)
         parts.append("</tbody></table>")
-        return "".join(parts)
+        table = "".join(parts)
+
+        if not self.template:
+            style_block = _style_block(result) if self.css else ""
+            return style_block + table
+
+        title = _esc(self.title or result.meta.title or "")
+        style_block = _style_block(result) if self.css else ""
+        head = f'<meta charset="utf-8"><title>{title}</title>{style_block}'
+        return (
+            "<!DOCTYPE html><html><head>"
+            + head
+            + f'</head><body class="report">{table}</body></html>'
+        )
 
     def _ncols(self, result) -> int:
         return len(result.columns) or 1
