@@ -469,7 +469,7 @@ def test_multi_dataset_source():
 
 
 def test_suppress_zero_missing_column():
-    # regresión documenta bug conocido — ver CONCERNS.md §Known Bugs (suppress_zero)
+    # CORR-11: columna de suppress_zero inexistente falla con ValueError claro.
     rows = [
         {"agente": "Ana", "monto": 100},
         {"agente": "Bob", "monto": 200},
@@ -479,9 +479,9 @@ def test_suppress_zero_missing_column():
     rep.section("por_agente").total("sum", "monto")
     rep.group("global")
     rep.section("global").suppress_zero(column="columna_inexistente")
-    result = rep.run()
 
-    assert len(result.root.children) == 0
+    with pytest.raises(ValueError, match="suppress_zero inexistente"):
+        rep.run()
 
 
 @pytest.mark.xfail(
@@ -526,21 +526,17 @@ def test_named_total_none_values():
 
 
 def test_unhashable_group_value():
-    # regresión documenta bug conocido — ver CONCERNS.md §Known Bugs (no hashable)
+    # CORR-12: valor no hashable en la columna de agrupación falla con ValueError claro.
     rows = [{"tags": ["a", "b"], "monto": 1}]
     rep = Report(rows)
     rep.group("por_tags", columns="tags")
     rep.section("por_tags").total("sum", "monto")
     rep.group("global")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="no hashable en la columna de agrupación"):
         rep.run()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug conocido — ver CONCERNS.md §Fragile Areas (errores chart/pivot sin contexto)",
-)
 def test_chart_pivot_error_context():
     from encino_rpt.aggregation import AggregationError
 
@@ -551,5 +547,5 @@ def test_chart_pivot_error_context():
     rep.group("global")
     rep.section("global").chart("bar", operator="sum", expression="1 / (monto - 1)")
 
-    with pytest.raises(AggregationError):
+    with pytest.raises(AggregationError, match="gráfico"):
         rep.run()

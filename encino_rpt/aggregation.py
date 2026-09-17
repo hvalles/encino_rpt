@@ -182,6 +182,18 @@ def _partition(spec, rows):
     order = []
     for r in rows:
         key = tuple(r.get(c) for c in spec.columns)
+        try:
+            hash(key)
+        except TypeError as exc:
+            for c in spec.columns:
+                value = r.get(c)
+                try:
+                    hash(value)
+                except TypeError:
+                    raise ValueError(
+                        f"valor no hashable en la columna de agrupación {c!r}: {value!r}"
+                    ) from exc
+            raise
         if key not in index:
             index[key] = []
             order.append(key)
@@ -355,7 +367,16 @@ def _build_instance(
         fn = _make_value_fn(
             cs.operator, cs.column, cs.expression, report._functions, report._aggregates
         )
-        extras.append(build_chart(cs, child_pairs, node.totals, fn))
+        extras.append(
+            _wrap(
+                f"gráfico (grupo {spec.name!r})",
+                build_chart,
+                cs,
+                child_pairs,
+                node.totals,
+                fn,
+            )
+        )
     for ps in spec.pivots:
         fn = _make_value_fn(
             ps.operator,
@@ -364,7 +385,9 @@ def _build_instance(
             report._functions,
             report._aggregates,
         )
-        extras.append(build_pivot(ps, rows, fn))
+        extras.append(
+            _wrap(f"pivote (grupo {spec.name!r})", build_pivot, ps, rows, fn)
+        )
     node.children = node.children + extras
 
     return node, rows
@@ -435,11 +458,24 @@ def _is_zero(child, sz):
         return False
     if column:
         if isinstance(child, Group):
-            v = child.key.get(column) if child.key else None
+            if child.key is None or column not in child.key:
+                raise ValueError(
+                    f"columna de suppress_zero inexistente: {column!r} "
+                    f"(hijo {_child_desc(child)!r})"
+                )
+            v = child.key[column]
         elif isinstance(child, Detail):
-            v = child.row.get(column)
+            if column not in child.row:
+                raise ValueError(
+                    f"columna de suppress_zero inexistente: {column!r} "
+                    f"(hijo {_child_desc(child)!r})"
+                )
+            v = child.row[column]
         else:
-            v = None
+            raise ValueError(
+                f"columna de suppress_zero inexistente: {column!r} "
+                f"(hijo {_child_desc(child)!r})"
+            )
         return v is None or v == 0
     return False
 

@@ -13,8 +13,12 @@ def build_pivot(spec, rows, value_fn) -> Pivot:
     - `rows`: renglones ya enriquecidos.
     - `value_fn(rows)`: agrega el operador sobre un conjunto de renglones.
     """
-    row_values = _ordered_unique(r.get(spec.row_column) for r in rows)
-    col_values = _ordered_unique(r.get(spec.column_column) for r in rows)
+    row_values = _ordered_unique(
+        _assert_hashable(spec.row_column, r.get(spec.row_column)) for r in rows
+    )
+    col_values = _ordered_unique(
+        _assert_hashable(spec.column_column, r.get(spec.column_column)) for r in rows
+    )
     row_index = {v: i for i, v in enumerate(row_values)}
     col_index = {v: i for i, v in enumerate(col_values)}
 
@@ -22,8 +26,8 @@ def build_pivot(spec, rows, value_fn) -> Pivot:
     row_buckets: dict[Any, list[Any]] = {}
     col_buckets: dict[Any, list[Any]] = {}
     for r in rows:
-        rv = r.get(spec.row_column)
-        cv = r.get(spec.column_column)
+        rv = _assert_hashable(spec.row_column, r.get(spec.row_column))
+        cv = _assert_hashable(spec.column_column, r.get(spec.column_column))
         buckets.setdefault((rv, cv), []).append(r)
         row_buckets.setdefault(rv, []).append(r)
         col_buckets.setdefault(cv, []).append(r)
@@ -54,3 +58,18 @@ def _ordered_unique(values):
             seen.add(v)
             out.append(v)
     return out
+
+
+def _assert_hashable(column, value):
+    """Valida que `value` sea hashable (clave de agrupación del pivote).
+
+    Lanza `ValueError` claro (nombrando la columna) en vez del `TypeError`
+    crudo que produciría usarlo como clave de un `dict`/`set`.
+    """
+    try:
+        hash(value)
+    except TypeError as exc:
+        raise ValueError(
+            f"valor no hashable en la columna de pivote {column!r}: {value!r}"
+        ) from exc
+    return value
