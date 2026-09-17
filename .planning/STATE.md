@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Readers multi-formato + Templates HTML/Markdown
+milestone: v1.2
+milestone_name: Engine bug fixes (correctness)
 status: complete
-stopped_at: Completed 10-01-PLAN.md
-last_updated: 2026-09-17T05:42:00Z
+stopped_at: Completed 11-01-PLAN.md
+last_updated: 2026-09-17T13:49:48Z
 last_activity: 2026-09-17
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 9
-  completed_plans: 9
+  total_phases: 11
+  completed_phases: 11
+  total_plans: 10
+  completed_plans: 10
   percent: 100
 ---
 
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-16)
 
 **Core value:** Producir reportes financieros correctos y seguros — agregación y renderizado exactos, idempotentes y sin inyecciones.
-**Current focus:** Milestone v1.1 — Readers multi-formato + Templates HTML/Markdown
+**Current focus:** Milestone v1.2 — Engine bug fixes (correctness)
 
 ## Current Position
 
-Phase: 10
-Plan: 01 complete (Templates HTML + Markdown)
+Phase: 11
+Plan: 01 complete (Engine bug fixes)
 Status: Complete
 Last activity: 2026-09-17
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -48,6 +48,7 @@ Progress: [██████████] 100%
 | 08 | 4 | - | - |
 | 09 | 1 | - | - |
 | 10 | 1 | - | - |
+| 11 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -61,6 +62,7 @@ Progress: [██████████] 100%
 | Phase 08 P04 | 11min | 3 tasks | 7 files |
 | Phase 9 P1 | 5min | 3 tasks | 4 files |
 | Phase 10 P1 | 7min | 4 tasks | 5 files |
+| Phase 11 P1 | 7min | 5 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -84,6 +86,7 @@ Recent decisions affecting current work:
 - [Phase 10]: modo clases HTML opt-in (`css=False` por defecto, byte-idéntico al inline); el CSS del bloque `<style>` reutiliza `_SAFE_PROP`/`_UNSAFE_VALUE`/`_esc` (sin superficie de inyección nueva).
 - [Phase 10]: `MarkdownRenderer` consume `walk()`; `_md_cell` escapa valores planos y emite links/imágenes nativos, `_md_table` escapa solo headers (evita doble-escape de `|`); wrapper de documento estructural (nunca Jinja2).
 - [v1.1 Streaming]: SQLite temp-table descartado (pre-agregación fuera de alcance: rompe funciones custom, contradice el no-objetivo SQL y no resuelve la memoria de salida); streaming de ENTRADA = no-objetivo definitivo; streaming de SALIDA implementado (iter_csv/iter_text/iter_html/iter_markdown + `file=`), manteniendo el path `to_*` sin `file=` byte-idéntico.
+- [Phase 11]: CORR-08 = `detail(source=)` solo a nivel raíz (opción b; con grupos `ValueError`); CORR-13 = `count`+expression conteo condicional (truthy), `count` sin expresión cuenta filas; CORR-09 = total `None` contribuye `0` al registro; CORR-14 = límite de profundidad documentado + `ValueError` claro (no serialización iterativa).
 
 ### Pending Todos
 
@@ -103,6 +106,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T05:42:00Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-09-17T13:49:48Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None

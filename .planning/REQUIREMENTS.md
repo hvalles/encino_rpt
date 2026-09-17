@@ -79,13 +79,13 @@ Milestone v1.1: Readers multi-formato + Templates HTML/Markdown.
 
 Milestone v1.2: Engine bug fixes (correctness). Bugs documentados en `CONCERNS.md`.
 
-- [ ] **CORR-08**: `detail(source=...)` usa el dataset indicado (multi-dataset detail), no el principal.
-- [ ] **CORR-09**: totales nombrados con valor `None` no rompen el acumulador del registro (`0 + None`).
-- [ ] **CORR-10**: errores de chart/pivot se envuelven con contexto de grupo (`_wrap`).
-- [ ] **CORR-11**: `suppress_zero(column=...)` con columna inexistente lanza error claro (no suprime todo el grupo).
-- [ ] **CORR-12**: valores no hashables al agrupar/pivotear lanzan error claro (no `TypeError` crudo).
-- [ ] **CORR-13**: `count` con `expression=` tiene semántica documentada y consistente.
-- [ ] **CORR-14**: jerarquías profundas no revientan `to_json()`/`model_dump()` con `RecursionError` (límite documentado o error claro).
+- [x] **CORR-08**: `detail(source=...)` usa el dataset indicado (multi-dataset detail), no el principal.
+- [x] **CORR-09**: totales nombrados con valor `None` no rompen el acumulador del registro (`0 + None`).
+- [x] **CORR-10**: errores de chart/pivot se envuelven con contexto de grupo (`_wrap`).
+- [x] **CORR-11**: `suppress_zero(column=...)` con columna inexistente lanza error claro (no suprime todo el grupo).
+- [x] **CORR-12**: valores no hashables al agrupar/pivotear lanzan error claro (no `TypeError` crudo).
+- [x] **CORR-13**: `count` con `expression=` tiene semántica documentada y consistente.
+- [x] **CORR-14**: jerarquías profundas no revientan `to_json()`/`model_dump()` con `RecursionError` (límite documentado o error claro).
 
 ## v2 Requirements
 
@@ -139,13 +139,13 @@ Deferred. No en el roadmap actual.
 | TMPL-03 | Phase 10 | Complete |
 | TMPL-04 | Phase 10 | Complete |
 | STRM-01 | Direct (streaming de salida) | Complete |
-| CORR-08 | Phase 11 | Pending |
-| CORR-09 | Phase 11 | Pending |
-| CORR-10 | Phase 11 | Pending |
-| CORR-11 | Phase 11 | Pending |
-| CORR-12 | Phase 11 | Pending |
-| CORR-13 | Phase 11 | Pending |
-| CORR-14 | Phase 11 | Pending |
+| CORR-08 | Phase 11 | Complete |
+| CORR-09 | Phase 11 | Complete |
+| CORR-10 | Phase 11 | Complete |
+| CORR-11 | Phase 11 | Complete |
+| CORR-12 | Phase 11 | Complete |
+| CORR-13 | Phase 11 | Complete |
+| CORR-14 | Phase 11 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total

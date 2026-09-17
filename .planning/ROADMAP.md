@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### Milestone v1.2 — Engine bug fixes (correctness)
 
-- [ ] **Phase 11: Engine bug fixes** - `detail(source=)`, totales `None`, contexto chart/pivot, `suppress_zero`/no-hashable con error claro, `count` semántica, serialización profunda
+- [x] **Phase 11: Engine bug fixes** - `detail(source=)`, totales `None`, contexto chart/pivot, `suppress_zero`/no-hashable con error claro, `count` semántica, serialización profunda (completed 2026-09-17)
 
 ## Phase Details
 
@@ -198,10 +198,29 @@ Plans:
 
 - [x] 10-01-PLAN.md — Templates HTML + Markdown renderer
 
+### Phase 11: Engine bug fixes
+
+**Goal**: Fail-loudly y consistencia en el motor — `suppress_zero`/agrupación no-hashable con `ValueError` claro, contexto de grupo en chart/pivot, guard de `None` en el registro, semántica documentada de `count`, `detail(source=)` funcional a nivel raíz, y serialización JSON profunda con error controlado.
+**Depends on**: Phase 10
+**Requirements**: CORR-08, CORR-09, CORR-10, CORR-11, CORR-12, CORR-13, CORR-14
+**Success Criteria** (what must be TRUE):
+
+  1. chart/pivot con expresión inválida lanzan `AggregationError` con contexto de grupo (no `ExpressionError`/`TypeError` crudo).
+  2. `suppress_zero` y agrupación con columna inexistente / valor no hashable lanzan `ValueError` claro (no supresión silenciosa ni `TypeError`).
+  3. total nombrado con valor `None` no rompe el registro (`0 + None`).
+  4. los tests xfail existentes pasan a asserts verdes al corregir el bug correspondiente.
+
+**Plans**: 1 plan
+
+Plans:
+**Wave 1**
+
+- [x] 11-01-PLAN.md — Engine bug fixes (CORR-08…CORR-14)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -215,3 +234,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 8. Tests & CI | 4/4 | Complete   | 2026-09-17 |
 | 9. Readers multi-formato | 1/1 | Complete | 2026-09-17 |
 | 10. Templates HTML + Markdown | 1/1 | Complete | 2026-09-17 |
+| 11. Engine bug fixes | 1/1 | Complete | 2026-09-17 |
