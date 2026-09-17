@@ -491,3 +491,42 @@ def test_count_expression_semantics():
 
     assert result.root.totals[0].value == 1
 
+
+# --- regresiones TEST-01 (crash/error) ---
+@pytest.mark.xfail(strict=True, reason="bug conocido — ver CONCERNS.md §Known Bugs (totales nombrados None)")
+def test_named_total_none_values():
+    rows = [{"monto": None}, {"monto": None}]
+    rep = Report(rows)
+    rep.group("global")
+    rep.section("global").total("avg", "monto", name="promedio")
+    result = rep.run()
+
+    assert result.root.totals[0].value is None
+
+
+def test_unhashable_group_value():
+    # regresión documenta bug conocido — ver CONCERNS.md §Known Bugs (no hashable)
+    rows = [{"tags": ["a", "b"], "monto": 1}]
+    rep = Report(rows)
+    rep.group("por_tags", columns="tags")
+    rep.section("por_tags").total("sum", "monto")
+    rep.group("global")
+
+    with pytest.raises(TypeError):
+        rep.run()
+
+
+@pytest.mark.xfail(strict=True, reason="bug conocido — ver CONCERNS.md §Fragile Areas (errores chart/pivot sin contexto)")
+def test_chart_pivot_error_context():
+    from encino_rpt.aggregation import AggregationError
+
+    rows = [{"agente": "Ana", "monto": 1}]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "monto")
+    rep.group("global")
+    rep.section("global").chart("bar", operator="sum", expression="1 / (monto - 1)")
+
+    with pytest.raises(AggregationError):
+        rep.run()
+
