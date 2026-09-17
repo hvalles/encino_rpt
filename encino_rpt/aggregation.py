@@ -69,6 +69,14 @@ def _aggregate(operator, values):
 
 
 def _value_for(operator, column, expression, rows, functions, aggregates):
+    """Calcula el valor de un agregado sobre `rows`.
+
+    Semántica de `count`:
+    - `count` sin `expression` cuenta filas (`len(rows)`).
+    - `count` con `expression` es un conteo condicional: cuenta las filas cuya
+      expresión evalúa *truthy* (las filas con resultado falsy —0, None, False—
+      no se cuentan).
+    """
     if operator.startswith("custom:"):
         name = operator.split(":", 1)[1]
         fn = aggregates.get(name)

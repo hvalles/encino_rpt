@@ -500,14 +500,18 @@ def test_detail_source_ignored():
 
 
 def test_count_expression_semantics():
-    # regresión documenta bug conocido — ver CONCERNS.md §Known Bugs (count truthy vs rows)
+    # CORR-13: `count` sin expresión cuenta filas; `count` + expresión cuenta
+    # filas cuya evaluación es truthy (conteo condicional).
     rows = [{"monto": 10}, {"monto": -5}, {"monto": 0}]
     rep = Report(rows)
     rep.group("global")
-    rep.section("global").total("count", expression="monto > 0")
+    rep.section("global").total("count", expression="monto > 0", name="positivos")
+    rep.section("global").total("count", name="filas")
     result = rep.run()
 
-    assert result.root.totals[0].value == 1
+    by_name = {t.name: t.value for t in result.root.totals}
+    assert by_name["positivos"] == 1
+    assert by_name["filas"] == 3
 
 
 def test_named_total_none_values():
