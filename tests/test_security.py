@@ -149,3 +149,28 @@ def test_excel_header_sanitized():
     ws = result.to_excel()
     assert ws["A1"].value == "=1+1"
     assert ws["A1"].data_type == "s"
+
+
+# --- regresiones TEST-01 (seguridad) ---
+def test_expression_null_byte():
+    # regresión documenta bug conocido — ver CONCERNS.md §Security (null byte):
+    # Python 3.10 lanza ValueError crudo; 3.11+ lanza ExpressionError (subclase de ValueError)
+    with pytest.raises(ValueError):
+        evaluate("\x00", {})
+
+
+def test_excel_formula_mode_no_user_injection():
+    pytest.importorskip("openpyxl")
+    rows = [{"sku": "=1+1", "cantidad": 2}]
+    rep = Report(rows)
+    rep.detail("sku", "cantidad")
+    rep.group("global")
+    rep.section("global").total("sum", "cantidad")
+    result = rep.run()
+
+    ws = result.to_excel(formulas=True)
+    # valor de usuario NUNCA es fórmula viva (saneado a texto)
+    assert ws["A2"].value == "=1+1"
+    assert ws["A2"].data_type == "s"
+    # solo la fórmula SUM interna (generada por índices de fila) es fórmula viva
+    assert [c.value for row in ws.iter_rows() for c in row if c.data_type == "f"] == ["=SUM(B2)"]
