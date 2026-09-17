@@ -1,33 +1,35 @@
-"""Modelo de datos canónico del reporte (pydantic, serializable a JSON)."""
+"""Modelo de datos canónico del reporte (dataclasses stdlib, serializable a JSON)."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
 
-
-class Link(BaseModel):
+@dataclass
+class Link:
     """Enlace a otra sección, reporte, página o URL externa."""
 
-    type: Literal["link"] = "link"
     target: Literal["section", "report", "page", "external"]
     href: str
+    type: Literal["link"] = "link"
     label: str | None = None
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
 
-class Image(BaseModel):
+@dataclass
+class Image:
     """Imagen por ruta, URL o data URI."""
 
-    type: Literal["image"] = "image"
     src: str
+    type: Literal["image"] = "image"
     alt: str | None = None
     width: int | None = None
     height: int | None = None
 
 
-class Format(BaseModel):
+@dataclass
+class Format:
     """Formato de presentación de una columna o total (lo aplican los renderers)."""
 
     kind: Literal["number", "currency", "percent", "date"] = "number"
@@ -40,7 +42,8 @@ class Format(BaseModel):
     pattern: str | None = None  # kind="date": patrón strftime
 
 
-class Total(BaseModel):
+@dataclass
+class Total:
     """Total de un corte (resultado ya calculado)."""
 
     operator: str
@@ -53,99 +56,150 @@ class Total(BaseModel):
     column_position: str | None = None
 
 
-class Detail(BaseModel):
+@dataclass
+class Detail:
     """Renglón del detalle."""
 
-    type: Literal["detail"] = "detail"
     row: dict[str, Any]
+    type: Literal["detail"] = "detail"
 
 
-class Series(BaseModel):
+@dataclass
+class Series:
     """Serie de un gráfico (una línea/barra/sector)."""
 
     label: str | None = None
-    values: list[Any] = Field(default_factory=list)
+    values: list[Any] = field(default_factory=list)
 
 
-class Chart(BaseModel):
-    type: Literal["chart"] = "chart"
+@dataclass
+class Chart:
     kind: Literal["pie", "bar", "line"]
+    type: Literal["chart"] = "chart"
     title: str | None = None
-    labels: list[Any] = Field(default_factory=list)
-    series: list[Series] = Field(default_factory=list)
-    options: dict[str, Any] = Field(default_factory=dict)
+    labels: list[Any] = field(default_factory=list)
+    series: list[Series] = field(default_factory=list)
+    options: dict[str, Any] = field(default_factory=dict)
 
 
-class Pivot(BaseModel):
+@dataclass
+class Pivot:
     """Matriz de doble entrada (cross-tab): filas x columnas."""
 
     type: Literal["pivot"] = "pivot"
     title: str | None = None
-    rows: list[Any] = Field(default_factory=list)
-    columns: list[Any] = Field(default_factory=list)
-    cells: list[list[Any]] = Field(default_factory=list)
-    row_totals: list[Any] = Field(default_factory=list)
-    column_totals: list[Any] = Field(default_factory=list)
-    options: dict[str, Any] = Field(default_factory=dict)
+    rows: list[Any] = field(default_factory=list)
+    columns: list[Any] = field(default_factory=list)
+    cells: list[list[Any]] = field(default_factory=list)
+    row_totals: list[Any] = field(default_factory=list)
+    column_totals: list[Any] = field(default_factory=list)
+    options: dict[str, Any] = field(default_factory=dict)
 
 
-class ConditionalRule(BaseModel):
+@dataclass
+class ConditionalRule:
     """Regla de formato condicional por valor (la aplican los renderers)."""
 
     column: str | None = None
     when: Literal["lt", "le", "gt", "ge", "eq", "ne"] = "lt"
     value: Any = 0
-    style: dict[str, Any] = Field(default_factory=dict)
+    style: dict[str, Any] = field(default_factory=dict)
 
 
-class Kpi(BaseModel):
+@dataclass
+class Kpi:
     """Tarjeta de indicador (métrica escalar)."""
 
     type: Literal["kpi"] = "kpi"
     label: str | None = None
     value: Any = None
     format: Format | None = None
-    options: dict[str, Any] = Field(default_factory=dict)
+    options: dict[str, Any] = field(default_factory=dict)
 
 
-class Group(BaseModel):
+@dataclass
+class Group:
     type: Literal["group"] = "group"
-    name: str
+    name: str = ""
     key: dict[str, Any] | None = None
     header: str | None = None
     footer: str | None = None
     show_collapsed: bool = False
     default_collapsed: bool = False
     page_break: bool = False
-    totals: list[Total] = Field(default_factory=list)
-    children: list[Detail | Group | Chart | Pivot] = Field(default_factory=list)
+    totals: list[Total] = field(default_factory=list)
+    children: list[Detail | Group | Chart | Pivot] = field(default_factory=list)
 
-    # Contexto interno (no serializado) para renderizar header/footer en la fase final.
-    _first_row: dict = PrivateAttr(default_factory=dict)
-    _header_tpl: str | None = PrivateAttr(default=None)
-    _footer_tpl: str | None = PrivateAttr(default=None)
+    def __post_init__(self):
+        # Contexto interno (no serializado) para renderizar header/footer en la
+        # fase final. Atributos de instancia (no campos), replican PrivateAttr.
+        self._first_row: dict = {}
+        self._header_tpl: str | None = None
+        self._footer_tpl: str | None = None
 
 
-class ReportMeta(BaseModel):
+@dataclass
+class ReportMeta:
     """Metadatos del reporte (título y parámetros de la consulta)."""
 
     title: str | None = None
-    params: list[Any] = Field(default_factory=list)
+    params: list[Any] = field(default_factory=list)
 
 
-class ReportResult(BaseModel):
+@dataclass
+class ReportResult:
     """Árbol canónico del reporte (dato puro, serializable a JSON).
 
     Expone métodos de conveniencia (`render_html`, `to_csv`, `to_text`,
-    `to_excel`, `to_pdf`) que delegan en los renderers sin modificar el árbol.
+    `to_excel`, `to_pdf`, `to_json`) que delegan en los renderers sin modificar
+    el árbol, y `to_dict`/`from_dict`/`from_json` para la serialización.
     """
 
-    meta: ReportMeta = Field(default_factory=ReportMeta)
-    columns: list[str] = Field(default_factory=list)
-    formats: dict[str, Format] = Field(default_factory=dict)
-    styles: list[ConditionalRule] = Field(default_factory=list)
-    kpis: list[Kpi] = Field(default_factory=list)
     root: Group
+    meta: ReportMeta = field(default_factory=ReportMeta)
+    columns: list[str] = field(default_factory=list)
+    formats: dict[str, Format] = field(default_factory=dict)
+    styles: list[ConditionalRule] = field(default_factory=list)
+    kpis: list[Kpi] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Devuelve el árbol como dict con tipos JSON nativos.
+
+        Returns:
+            El árbol canónico como `dict` (equivalente al anterior
+            `model_dump(mode="json")`), sin `schema_version`.
+        """
+        from ._serialize import to_jsonable
+
+        return to_jsonable(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ReportResult:
+        """Reconstruye un `ReportResult` a partir de un dict (round-trip).
+
+        Args:
+            data: Dict producido por `to_dict()` (o `to_json()` parseado).
+
+        Returns:
+            El `ReportResult` reconstruido.
+        """
+        from ._serialize import from_dict
+
+        return from_dict(data)
+
+    @classmethod
+    def from_json(cls, s: str) -> ReportResult:
+        """Reconstruye un `ReportResult` a partir de una cadena JSON.
+
+        Args:
+            s: JSON producido por `to_json()`.
+
+        Returns:
+            El `ReportResult` reconstruido.
+        """
+        import json
+
+        return cls.from_dict(json.loads(s))
 
     def render_html(
         self,
@@ -363,6 +417,3 @@ class ReportResult(BaseModel):
         return PdfRenderer().render(
             self, repeat_header=repeat_header, file=file, **opts
         )
-
-
-Group.model_rebuild()

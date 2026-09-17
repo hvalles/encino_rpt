@@ -412,8 +412,39 @@ def test_json_renderer_roundtrip():
     assert data["schema_version"] == "1.0"
     assert data["root"]["type"] == "group"
 
-    restored = ReportResult.model_validate(data)
+    restored = ReportResult.from_dict(data)
     assert restored.root.totals[0].value == 2
+
+
+def test_roundtrip_full_tree():
+    # round-trip del reconstructor `from_dict` sobre todos los tipos de nodo.
+    from encino_rpt import ReportResult
+
+    rows = [
+        {"agente": "Ana", "sku": "A", "monto": 100},
+        {"agente": "Ana", "sku": "B", "monto": 50},
+        {"agente": "Bob", "sku": "A", "monto": 200},
+    ]
+    rep = Report(rows)
+    rep.link("ver", "report", href="/p/{{sku}}", label="Ver", after="sku")
+    rep.detail("sku", "agente", "monto")
+    rep.set_format("monto", kind="currency", symbol="$", decimals=2)
+    rep.add_style("monto", when="lt", value=100, color="red")
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "monto")
+    rep.section("por_agente").chart(
+        "pie", operator="sum", column="monto", label_field="sku"
+    )
+    rep.section("por_agente").pivot(
+        "sku", "agente", operator="sum", value_column="monto"
+    )
+    rep.group("global")
+    rep.section("global").total("sum", "monto")
+    result = rep.run()
+
+    data = result.to_dict()
+    restored = ReportResult.from_dict(data)
+    assert restored.to_dict() == data
 
 
 def test_deep_path_renders_iteratively():
@@ -449,15 +480,14 @@ def test_deep_tree_to_json():
 
 
 def test_to_json_non_serializable_not_masked():
-    # MA-01: un valor no serializable no debe relabelarse como "demasiado profunda".
+    # un valor no serializable lanza TypeError (no se enmascara como "profundo").
     rows = [{"sku": object(), "monto": 1}]
     rep = Report(rows)
     rep.detail("sku", "monto")
     result = rep.run()
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(TypeError):
         result.to_json()
-    assert "demasiado profunda" not in str(exc.value)
 
 
 def test_excel_footer_renders_full_row():

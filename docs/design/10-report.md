@@ -46,7 +46,7 @@ Tres capas desacopladas:
 
 ```
 list[dict]  ──►  Builder (Report)  ──►  Árbol canónico (ReportResult)  ──►  Renderers
- (entrada)      enriquecer/agrupar        dato puro (JSON vía model_dump)     HTML/Excel/CSV/PDF/Texto
+ (entrada)      enriquecer/agrupar        dato puro (JSON vía to_dict)     HTML/Excel/CSV/PDF/Texto
 ```
 
 1. **Entrada**: filas `list[dict]` + parámetros de la consulta (`params`).
@@ -60,24 +60,25 @@ list[dict]  ──►  Builder (Report)  ──►  Árbol canónico (ReportResu
 
 ## 3. Modelo de datos canónico
 
-Estructura tipada (pydantic, como `Records`) y serializable a JSON. Cada nodo
-lleva un **discriminador de tipo**; las celdas pueden ser escalares o
-descriptores `Link`/`Image`.
+Estructura tipada (dataclasses stdlib, sin dependencias runtime) y serializable a
+JSON. Cada nodo lleva un **discriminador de tipo**; las celdas pueden ser escalares
+o descriptores `Link`/`Image`.
 
 ```python
 # encino_rpt/models.py
-from typing import Any, Literal, Union
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
-class Link(BaseModel):
+# (las clases se declaran con @dataclass)
+class Link:
     """Enlace a otra sección, reporte, página o URL externa."""
     type: Literal["link"] = "link"
     target: Literal["section", "report", "page", "external"]
     href: str
     label: str | None = None
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
-class Image(BaseModel):
+class Image
     """Imagen por ruta, URL o data URI."""
     type: Literal["image"] = "image"
     src: str
@@ -85,7 +86,7 @@ class Image(BaseModel):
     width: int | None = None
     height: int | None = None
 
-class Format(BaseModel):
+class Format
     """Formato de presentación de una columna o total (lo aplican los renderers)."""
     kind: Literal["number", "currency", "percent", "date"] = "number"
     decimals: int | None = None          # None → no redondea
@@ -96,7 +97,7 @@ class Format(BaseModel):
     percent_scale: bool = False          # percent: multiplica por 100 al mostrar
     pattern: str | None = None           # kind="date": patrón strftime (p. ej. "%d/%m/%Y")
 
-class Total(BaseModel):
+class Total
     operator: str                    # sum | avg | count | count_distinct | max | min | custom:<name>
     column: str | None = None        # columna agregada (None en count global)
     expression: str | None = None    # expresión por renglón a agregar (p. ej. "es_par * total")
@@ -106,49 +107,49 @@ class Total(BaseModel):
     format: Format | None = None     # formato de presentación del total
     column_position: str | None = None   # pista de presentación (columna bajo la que se alinea)
 
-class Detail(BaseModel):
+class Detail
     type: Literal["detail"] = "detail"
     row: dict[str, Any]              # valores escalares o Link/Image
 
-class Series(BaseModel):
+class Series
     label: str | None = None
-    values: list[Any] = Field(default_factory=list)
+    values: list[Any] = field(default_factory=list)
 
-class Chart(BaseModel):
+class Chart
     type: Literal["chart"] = "chart"
     kind: Literal["pie", "bar", "line"]
     title: str | None = None
-    labels: list[Any] = Field(default_factory=list)   # misma longitud que series[i].values
-    series: list[Series] = Field(default_factory=list)
-    options: dict[str, Any] = Field(default_factory=dict)   # pistas de estilo (colores, apilado, …)
+    labels: list[Any] = field(default_factory=list)   # misma longitud que series[i].values
+    series: list[Series] = field(default_factory=list)
+    options: dict[str, Any] = field(default_factory=dict)   # pistas de estilo (colores, apilado, …)
 
-class Pivot(BaseModel):
+class Pivot
     """Matriz de doble entrada (cross-tab): filas × columnas."""
     type: Literal["pivot"] = "pivot"
     title: str | None = None
-    rows: list[Any] = Field(default_factory=list)        # valores de la dimensión fila
-    columns: list[Any] = Field(default_factory=list)     # valores de la dimensión columna
-    cells: list[list[Any]] = Field(default_factory=list) # [fila][columna] = valor
-    row_totals: list[Any] = Field(default_factory=list)
-    column_totals: list[Any] = Field(default_factory=list)
-    options: dict[str, Any] = Field(default_factory=dict)
+    rows: list[Any] = field(default_factory=list)        # valores de la dimensión fila
+    columns: list[Any] = field(default_factory=list)     # valores de la dimensión columna
+    cells: list[list[Any]] = field(default_factory=list) # [fila][columna] = valor
+    row_totals: list[Any] = field(default_factory=list)
+    column_totals: list[Any] = field(default_factory=list)
+    options: dict[str, Any] = field(default_factory=dict)
 
-class ConditionalRule(BaseModel):
+class ConditionalRule
     """Regla de formato condicional por valor (la aplican los renderers)."""
     column: str | None = None            # None → aplica a cualquier columna numérica
     when: Literal["lt", "le", "gt", "ge", "eq", "ne"] = "lt"
     value: Any = 0
-    style: dict[str, Any] = Field(default_factory=dict)   # {"color": "red", "bold": true}
+    style: dict[str, Any] = field(default_factory=dict)   # {"color": "red", "bold": true}
 
-class Kpi(BaseModel):
+class Kpi
     """Tarjeta de indicador (métrica escalar de primera clase)."""
     type: Literal["kpi"] = "kpi"
     label: str | None = None
     value: Any = None
     format: Format | None = None
-    options: dict[str, Any] = Field(default_factory=dict)
+    options: dict[str, Any] = field(default_factory=dict)
 
-class Group(BaseModel):
+class Group
     type: Literal["group"] = "group"
     name: str                        # identificador lógico del corte
     key: dict[str, Any] | None = None    # valores del corte (None en el grupo raíz)
@@ -157,19 +158,19 @@ class Group(BaseModel):
     show_collapsed: bool = False     # ¿el encabezado se muestra aunque el grupo esté colapsado?
     default_collapsed: bool = False  # presentación inicial (abierta/cerrada) para renderers interactivos
     page_break: bool = False         # pista: iniciar este corte en página nueva (PDF/impresión)
-    totals: list[Total] = Field(default_factory=list)
-    children: list[Union[Detail, Group, Chart, Pivot]] = Field(default_factory=list)
+    totals: list[Total] = field(default_factory=list)
+    children: list[Union[Detail, Group, Chart, Pivot]] = field(default_factory=list)
 
-class ReportMeta(BaseModel):
+class ReportMeta
     title: str | None = None
-    params: list[Any] = Field(default_factory=list)
+    params: list[Any] = field(default_factory=list)
 
-class ReportResult(BaseModel):
-    meta: ReportMeta = Field(default_factory=ReportMeta)
-    columns: list[str] = Field(default_factory=list)   # orden del detalle
-    formats: dict[str, Format] = Field(default_factory=dict)   # columna -> formato
-    styles: list[ConditionalRule] = Field(default_factory=list)   # formato condicional
-    kpis: list[Kpi] = Field(default_factory=list)   # tarjetas de indicador (resumen)
+class ReportResult
+    meta: ReportMeta = field(default_factory=ReportMeta)
+    columns: list[str] = field(default_factory=list)   # orden del detalle
+    formats: dict[str, Format] = field(default_factory=dict)   # columna -> formato
+    styles: list[ConditionalRule] = field(default_factory=list)   # formato condicional
+    kpis: list[Kpi] = field(default_factory=list)   # tarjetas de indicador (resumen)
     root: Group
 ```
 
@@ -462,7 +463,7 @@ rep.section("global").chart("pie", title="Ventas por agente",
 
 result = rep.run()
 
-json_out = result.model_dump()            # (a) JSON canónico
+json_out = result.to_dict()            # (a) JSON canónico
 html = result.render_html(classes={...})  # (b) tabla HTML opcional
 ```
 
@@ -758,7 +759,7 @@ imports perezosos (para no cargar dependencias opcionales):
 
 ```python
 # encino_rpt/models.py (métodos sobre ReportResult)
-class ReportResult(BaseModel):
+class ReportResult
     ...
     def render_html(self, classes: dict | None = None, repeat_header: bool = False) -> str: ...   # HtmlRenderer
     def to_excel(self, ws=None, formulas: bool = False): ...      # ExcelRenderer (extra openpyxl/xlsxwriter)
@@ -767,7 +768,7 @@ class ReportResult(BaseModel):
     def to_pdf(self, *, repeat_header: bool = True, **opts): ...      # PdfRenderer (extra reportlab/weasyprint)
 ```
 
-> El JSON canónico es `model_dump()`; los métodos `render_*`/`to_*` son la fase 2
+> El JSON canónico es `to_dict()`; los métodos `render_*`/`to_*` son la fase 2
 > (presentación) y nunca modifican el árbol.
 
 Mapeo de nodos y celdas por destino:
@@ -835,7 +836,7 @@ encino-rpt/
 `[project.optional-dependencies]`: `excel = ["openpyxl"]` (o `xlsxwriter`),
 `pdf = ["reportlab"]` (o `weasyprint`) y `charts = ["matplotlib"]` (back
 server-side; en el front se usa Chart.js sin dependencia de Python). El núcleo no
-tiene dependencias (solo `pydantic`).
+no tiene dependencias runtime (stdlib puro).
 
 ---
 
@@ -899,7 +900,7 @@ result = Report(rows, params=params).group("global").run()
 
 ## 12. Dependencias
 
-- **Núcleo**: `pydantic>=2` (misma familia que `Records`); el formateo numérico
+- **Núcleo**: sin dependencias runtime; el formateo numérico
   usa stdlib (`locale`), sin dependencias adicionales.
 - **Extras**: `openpyxl`/`xlsxwriter` (Excel), `reportlab`/`weasyprint` (PDF),
   `matplotlib` (gráficos server-side). En el front, Chart.js (sin dependencia Python).
@@ -943,7 +944,7 @@ result = Report(rows, params=params).group("global").run()
 - **Gráficos**: `Chart` con `labels`/`series` derivados de `totals`/`key`;
   `pie`/`bar`/`line`; degradación a tabla resumen en CSV/Texto; round-trip JSON.
 - **Renderers**: HTML (clases por columna/grupo/total), CSV (aplanado), Excel
-  (hipervínculo/imagen/gráfico nativo), round-trip JSON (`model_dump`/`model_validate`).
+  (hipervínculo/imagen/gráfico nativo), round-trip JSON (`to_dict`/`from_dict`).
 - **Integración**: `Report(db.fetch_all(Query(...)))` contra SQLite (sin servidor).
 - **Regresión**: la suite de `encinorm` no cambia (el paquete es independiente).
 

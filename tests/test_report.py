@@ -305,9 +305,9 @@ def test_report_result_roundtrip():
     rep = Report(rows)
     rep.detail("sku", "cantidad")
     result = rep.run()
-    data = result.model_dump()
+    data = result.to_dict()
     assert data["root"]["type"] == "group"
-    restored = ReportResult.model_validate(data)
+    restored = ReportResult.from_dict(data)
     assert restored.columns == ["sku", "cantidad"]
 
 
@@ -346,7 +346,7 @@ def test_run_is_idempotent():
     rep.section("global").total("sum", "monto")
     first = rep.run()
     second = rep.run()
-    assert first.model_dump() == second.model_dump()
+    assert first.to_dict() == second.to_dict()
     assert len(second.root.children) == 2
 
 

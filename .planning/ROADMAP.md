@@ -32,6 +32,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 11: Engine bug fixes** - `detail(source=)`, totales `None`, contexto chart/pivot, `suppress_zero`/no-hashable con error claro, `count` semántica, serialización profunda (completed 2026-09-17)
 
+### Milestone v1.3 — Retirar pydantic (distribución ligera)
+
+- [x] **Phase 12: Retirar pydantic** - modelos como `dataclasses` stdlib, `to_dict`/`from_dict` propios, sin dependencias runtime (completed 2026-09-17)
+
 ## Phase Details
 
 ### Phase 1: Quick Wins (Corrección low-risk)

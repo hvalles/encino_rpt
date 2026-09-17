@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from ._specs import FieldSpec, GroupSpec, KpiSpec
 from .models import ConditionalRule, Format, ReportResult
@@ -120,12 +120,12 @@ class Report:
         self,
         column: str,
         *,
-        kind: str = "number",
+        kind: Literal["number", "currency", "percent", "date"] = "number",
         decimals: int | None = None,
         thousands: bool = False,
         symbol: str | None = None,
-        symbol_position: str = "prefix",
-        negative: str = "minus",
+        symbol_position: Literal["prefix", "suffix"] = "prefix",
+        negative: Literal["minus", "paren"] = "minus",
         percent_scale: bool = False,
         pattern: str | None = None,
     ) -> Report:
@@ -158,7 +158,12 @@ class Report:
         return self
 
     def add_style(
-        self, column: str | None = None, *, when: str = "lt", value: Any = 0, **style
+        self,
+        column: str | None = None,
+        *,
+        when: Literal["lt", "le", "gt", "ge", "eq", "ne"] = "lt",
+        value: Any = 0,
+        **style,
     ) -> Report:
         """Registra una regla de formato condicional por valor.
 

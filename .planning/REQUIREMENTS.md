@@ -87,6 +87,16 @@ Milestone v1.2: Engine bug fixes (correctness). Bugs documentados en `CONCERNS.m
 - [x] **CORR-13**: `count` con `expression=` tiene semántica documentada y consistente.
 - [x] **CORR-14**: jerarquías profundas no revientan `to_json()`/`model_dump()` con `RecursionError` (límite documentado o error claro).
 
+## v1.3 Requirements
+
+Milestone v1.3: Retirar pydantic (distribución ligera, stdlib puro).
+
+- [x] **MIG-01**: 13 modelos canónicos como `@dataclass` stdlib (semántica idéntica).
+- [x] **MIG-02**: `to_dict()`/`to_json()` serializan con coerción JSON (`Decimal`→str, `datetime`→iso) reemplazando `model_dump(mode="json")`.
+- [x] **MIG-03**: round-trip `ReportResult.from_dict()`/`from_json()` (dispatch por `type` en la unión recursiva `children`).
+- [x] **MIG-04**: `pydantic` eliminado de `pyproject.toml` (deps + plugin `pydantic.mypy`); `uv.lock` sincronizado.
+- [x] **MIG-05**: suite + mypy + ruff verdes; round-trip validado; `from_dict`/`from_json` exportados.
+
 ## v2 Requirements
 
 Deferred. No en el roadmap actual.
@@ -146,6 +156,11 @@ Deferred. No en el roadmap actual.
 | CORR-12 | Phase 11 | Complete |
 | CORR-13 | Phase 11 | Complete |
 | CORR-14 | Phase 11 | Complete |
+| MIG-01 | Phase 12 | Complete |
+| MIG-02 | Phase 12 | Complete |
+| MIG-03 | Phase 12 | Complete |
+| MIG-04 | Phase 12 | Complete |
+| MIG-05 | Phase 12 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total
