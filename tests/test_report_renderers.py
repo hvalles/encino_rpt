@@ -128,8 +128,8 @@ def test_html_css_mode_no_inline_style():
     assert "rpt-cond-0" in html_out
     assert "<style>" in html_out
     assert "color:red" in html_out
-    # la celda condicional usa clase, no style inline
-    assert '<td class="rpt-cond-0">' in html_out
+    # la celda condicional usa clase (y `num` por ser numérica), no style inline
+    assert 'class="rpt-cond-0 num"' in html_out
     assert '<td style="' not in html_out
 
 
@@ -140,8 +140,10 @@ def test_html_css_mode_default_unchanged():
     rep.add_style("total", when="lt", value=0, color="red")
     result = rep.run()
 
+    # modo default: estilos inline (sin bloque <style>); el número va a la derecha
     html_out = result.render_html()
-    assert 'style="color:red"' in html_out
+    assert "color:red" in html_out
+    assert "text-align:right" in html_out
     assert "<style>" not in html_out
 
 
@@ -169,7 +171,8 @@ def test_html_template_with_css_style_in_head():
     result = rep.run()
 
     html_out = result.render_html(template=True, css=True)
-    assert "<style>.rpt-cond-0{color:red}</style>" in html_out
+    assert ".rpt-cond-0{color:red}" in html_out
+    assert ".num{text-align:right}" in html_out
     assert "<head>" in html_out
     assert html_out.index("<style>") < html_out.index("</head>")
 
@@ -765,3 +768,36 @@ def test_chart_html_svg():
     assert "<path" in html  # porciones del pie
     assert "<polyline" in html  # serie de línea
     assert "<script" not in html and "canvas" not in html
+
+
+def test_html_indent_and_numeric_align():
+    rows = [{"agente": "Ana", "region": "Norte", "monto": 100}]
+    rep = Report(rows)
+    rep.detail("region", "monto")
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").header("N1")
+    rep.group("por_region", columns="region", parent="por_agente")
+    rep.section("por_region").header("N2")
+    rep.group("global")
+    rep.section("global").header("N0")
+    html = rep.run().render_html()
+
+    assert 'style="padding-left:1.5em">N1' in html  # depth 1
+    assert 'style="padding-left:3em">N2' in html  # depth 2
+    assert "text-align:right" in html  # monto a la derecha
+
+
+def test_excel_indent_and_numeric_align():
+    pytest.importorskip("openpyxl")
+    rows = [{"agente": "Ana", "region": "Norte", "monto": 100}]
+    rep = Report(rows)
+    rep.detail("region", "monto")
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").header("N1")
+    rep.group("global")
+    ws = rep.run().to_excel()
+
+    headers = [c for row in ws.iter_rows() for c in row if c.value == "N1"]
+    assert headers and headers[0].alignment.indent == 1
+    numerics = [c for row in ws.iter_rows() for c in row if c.value == 100]
+    assert numerics and numerics[0].alignment.horizontal == "right"

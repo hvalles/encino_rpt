@@ -7,7 +7,7 @@ import io
 from typing import Any
 
 from ..models import Image, Link
-from ._format import format_value
+from ._format import format_value, is_numeric
 from ._walk import walk
 
 
@@ -66,6 +66,7 @@ class PdfRenderer:
 
         rows: list[list[Any]] = []
         spans: list[tuple[int, int, int, int]] = []
+        self._numeric_cols: set[int] = set()
         self._collect(result.root, result, rows, spans)
 
         if result.columns:
@@ -81,6 +82,8 @@ class PdfRenderer:
             ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ]
+        for idx in sorted(self._numeric_cols):
+            tstyle.append(("ALIGN", (idx, 0), (idx, -1), "RIGHT"))
         for c1, r1, c2, r2 in spans:
             tstyle.append(("SPAN", (c1, r1 + 1), (c2, r2 + 1)))
         table.setStyle(TableStyle(tstyle))
@@ -93,28 +96,36 @@ class PdfRenderer:
 
     def _collect(self, root, result, rows, spans):
         ncols = len(result.columns) or 1
+        depth = 0
         for event, node in walk(root):
             if event == "group_start":
                 if node.header:
-                    self._full(node.header, rows, spans, ncols)
+                    self._full(node.header, rows, spans, ncols, depth)
+                depth += 1
             elif event == "group_end":
+                depth -= 1
                 for t in node.totals:
                     label = t.label or t.name or t.operator
                     fmt = t.format or (
                         result.formats.get(t.column) if t.column else None
                     )
                     self._full(
-                        f"{label}: {format_value(t.value, fmt)}", rows, spans, ncols
+                        f"{label}: {format_value(t.value, fmt)}",
+                        rows,
+                        spans,
+                        ncols,
+                        depth,
                     )
                 if node.footer:
-                    self._full(node.footer, rows, spans, ncols)
+                    self._full(node.footer, rows, spans, ncols, depth)
             elif event == "detail":
-                rows.append(
-                    [
-                        self._cell(node.row.get(c), result.formats.get(c))
-                        for c in result.columns
-                    ]
-                )
+                cells = []
+                for idx, c in enumerate(result.columns):
+                    value = node.row.get(c)
+                    if is_numeric(value):
+                        self._numeric_cols.add(idx)
+                    cells.append(self._cell(value, result.formats.get(c)))
+                rows.append(cells)
             elif event == "chart":
                 rows.append([self._chart_drawing(node)])
                 spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
@@ -134,10 +145,13 @@ class PdfRenderer:
             return Paragraph(_esc(value.src), self._normal)
         return format_value(value, fmt)
 
-    def _full(self, text, rows, spans, ncols):
+    def _full(self, text, rows, spans, ncols, depth=0):
         from reportlab.platypus import Paragraph
 
-        rows.append([Paragraph(f"<b>{_esc(text)}</b>", self._normal)])
+        style = self._normal
+        if depth:
+            style = self._normal.clone(f"indent{depth}", leftIndent=depth * 12)
+        rows.append([Paragraph(f"<b>{_esc(text)}</b>", style)])
         spans.append((0, len(rows) - 1, ncols - 1, len(rows) - 1))
 
     def _chart_drawing(self, node, width=460, height=200):

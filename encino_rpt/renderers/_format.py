@@ -6,6 +6,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 
+def is_numeric(value) -> bool:
+    """`True` si `value` es numérico (int/float/Decimal; excluye bool)."""
+    return isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)
+
+
 def format_value(value, fmt) -> str:
     """Devuelve la representación en texto de `value` según `fmt` (o `str` si no hay formato)."""
     if value is None:

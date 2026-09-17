@@ -7,7 +7,7 @@ import re as _re
 from collections.abc import Iterator
 
 from ..models import Image, Link
-from ._format import format_value
+from ._format import format_value, is_numeric
 from ._svg import render_chart_svg
 from ._walk import walk
 
@@ -100,6 +100,7 @@ class HtmlRenderer:
         return len(result.columns) or 1
 
     def _walk_chunks(self, root, result) -> Iterator[str]:
+        depth = 0
         for event, node in walk(root):
             if event == "group_start":
                 if node.default_collapsed:
@@ -110,8 +111,12 @@ class HtmlRenderer:
                         yield self._header_row(result)
                     if node.header:
                         cls = "group page-break" if node.page_break else "group"
-                        yield self._full_row(cls, node.header, self._ncols(result))
+                        yield self._full_row(
+                            cls, node.header, self._ncols(result), depth
+                        )
+                depth += 1
             elif event == "group_end":
+                depth -= 1
                 if node.default_collapsed:
                     yield "</details>"
                 for t in node.totals:
@@ -123,9 +128,12 @@ class HtmlRenderer:
                         "total",
                         f"{label}: {format_value(t.value, fmt)}",
                         self._ncols(result),
+                        depth,
                     )
                 if node.footer:
-                    yield self._full_row("group", node.footer, self._ncols(result))
+                    yield self._full_row(
+                        "group", node.footer, self._ncols(result), depth
+                    )
             elif event == "detail":
                 cells = []
                 for c in result.columns:
@@ -157,9 +165,13 @@ class HtmlRenderer:
             rows.append(f"<tr>{''.join(cells)}</tr>")
         return f'<table class="pivot"><tbody>{"".join(rows)}</tbody></table>'
 
-    def _full_row(self, css_class, text, ncols) -> str:
+    def _full_row(self, css_class, text, ncols, depth=0) -> str:
         cls = self.classes.get(css_class, css_class)
-        return f'<tr class="{_esc(cls)}"><td colspan="{ncols}">{_esc(text)}</td></tr>'
+        style = f' style="padding-left:{depth * 1.5:g}em"' if depth else ""
+        return (
+            f'<tr class="{_esc(cls)}"><td colspan="{ncols}"{style}>'
+            f"{_esc(text)}</td></tr>"
+        )
 
     def _header_row(self, result) -> str:
         header = "".join(f"<th>{_esc(c)}</th>" for c in result.columns)
@@ -184,13 +196,19 @@ class HtmlRenderer:
     def _cell_attrs(self, column, value, result) -> str:
         matched = _matched_rules(column, value, result.styles)
         if self.css:
-            classes = [i for i in matched if _css_decls(result.styles[i].style)]
-            if not classes:
+            names = [
+                f"rpt-cond-{i}" for i in matched if _css_decls(result.styles[i].style)
+            ]
+            if is_numeric(value):
+                names.append("num")
+            if not names:
                 return ""
-            return f' class="{" ".join(f"rpt-cond-{i}" for i in classes)}"'
+            return f' class="{" ".join(names)}"'
         style: dict = {}
         for i in matched:
             style.update(result.styles[i].style)
+        if is_numeric(value):
+            style["text-align"] = "right"
         return _style_attr(style)
 
 
@@ -241,11 +259,9 @@ def _css_decls(style) -> str:
 
 
 def _style_block(result) -> str:
-    rules = []
+    rules = [".num{text-align:right}"]
     for i, r in enumerate(result.styles):
         decls = _css_decls(r.style)
         if decls:
             rules.append(f".rpt-cond-{i}{{{decls}}}")
-    if not rules:
-        return ""
     return f"<style>{''.join(rules)}</style>"

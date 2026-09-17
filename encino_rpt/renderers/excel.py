@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..models import Image, Link
-from ._format import excel_number_format
+from ._format import excel_number_format, is_numeric
 from ._sanitize import write_excel_cell
 from ._walk import walk
 
@@ -88,13 +88,15 @@ class ExcelRenderer:
         return ws
 
     def _walk(self, root):
+        from openpyxl.styles import Alignment
+
         ws = self._ws
         group_stack: list[list[int]] = []
 
         for event, node in walk(root):
             if event == "group_start":
                 if node.header:
-                    self._full_row(node.header, bold=True)
+                    self._full_row(node.header, bold=True, depth=len(group_stack))
                 group_stack.append([])
             elif event == "detail":
                 row_idx = self._row
@@ -104,6 +106,8 @@ class ExcelRenderer:
                     nf = excel_number_format(self._result.formats.get(col))
                     if nf:
                         cell.number_format = nf
+                    if is_numeric(value):
+                        cell.alignment = Alignment(horizontal="right")
                     self._apply_conditional(cell, col, value)
                 self._row += 1
                 if group_stack:
@@ -115,7 +119,7 @@ class ExcelRenderer:
             elif event == "group_end":
                 detail_rows = group_stack.pop()
                 if node.footer:
-                    self._full_row(node.footer, bold=True)
+                    self._full_row(node.footer, bold=True, depth=len(group_stack))
                 for t in node.totals:
                     label = t.label or t.name or t.operator
                     col_idx = self._column_index(t.column)
@@ -139,7 +143,14 @@ class ExcelRenderer:
                     fmt = t.format or (
                         self._result.formats.get(t.column) if t.column else None
                     )
-                    self._total_row(label, value, pos_idx, fmt, formula=formula)
+                    self._total_row(
+                        label,
+                        value,
+                        pos_idx,
+                        fmt,
+                        formula=formula,
+                        depth=len(group_stack),
+                    )
                 if group_stack:
                     group_stack[-1].extend(detail_rows)
 
@@ -179,23 +190,27 @@ class ExcelRenderer:
         ]
         return "=SUM(" + ",".join(refs) + ")"
 
-    def _full_row(self, text, bold=False):
-        from openpyxl.styles import Font
+    def _full_row(self, text, bold=False, depth=0):
+        from openpyxl.styles import Alignment, Font
 
         cell = write_excel_cell(self._ws.cell(self._row, 1), text)
         if bold:
             cell.font = Font(bold=True)
+        if depth:
+            cell.alignment = Alignment(indent=depth)
         self._row += 1
 
-    def _total_row(self, label, value, col_idx, fmt, *, formula=False):
+    def _total_row(self, label, value, col_idx, fmt, *, formula=False, depth=0):
         ws = self._ws
-        from openpyxl.styles import Font
+        from openpyxl.styles import Alignment, Font
 
         ncols = len(self._result.columns) or 1
         if col_idx is None or col_idx < 1:
             col_idx = ncols
         cell = write_excel_cell(ws.cell(self._row, 1), label)
         cell.font = Font(bold=True)
+        if depth:
+            cell.alignment = Alignment(indent=depth)
         if formula:
             cell = ws.cell(self._row, col_idx, value)
         else:
