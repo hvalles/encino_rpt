@@ -374,17 +374,20 @@ node.children = _apply_order(spec, node.children, report._functions)
 | A5 | Los prefijos `\t` y `\r` en `_DANGEROUS_PREFIXES` quedan redundantes tras el recorte (un valor `"\t=1+1"` se detecta por el `=` post-recorte), pero mantenerlos es inofensivo | Code Examples | Bajo — solo afecta legibilidad; no cambiar el tuple minimiza el diff y conserva la lista OWASP documentada. |
 | A6 | `format_value` con `Decimal('nan')`/`Decimal('Infinity')` en el camino percent podría lanzar `decimal.InvalidOperation` | Common Pitfalls | Muy bajo — valores no-finitos en reportes financieros; si ocurre, fallback `str()` cubre (puede quedar como nota). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Alcance exacto de la limpieza documental en DEP-01 (A3)**
+   - **RESOLVED:** Plan 01-03 Task 2 implementa el re-fraseo neutro de `README.md`/`docs/index.md` ("salida de consultas a base de datos, sin acoplarse al motor") + audit final de 0 matches (`encino-orm|fetch_all|fetch_many|paginate`), según D-10; `docs/design/10-report.md` se conserva (contrato de diseño, ya dice "opcional/cero dependencias"); los snapshots GSD (`.planning/codebase/*.md`, `AGENTS.md`) NO se editan a mano — se regeneran con el próximo escaneo. A3 confirmada.
    - What we know: No hay doc de usuario que declare a `encino-orm` como dependencia; el diseño §10/§12 es explícito en "opcional/cero dependencias"; README/index.md referencian `fetch_all`/`paginate` como forma de los datos.
    - What's unclear: ¿El usuario quiere re-fraseo neutro de esas menciones ("salida de consultas ya materializadas") o basta el audit?
    - Recommendation: El plan debe incluir el audit + un micro-edit opcional de README/index.md con fraseo neutro; dejar `docs/design/10-report.md` intacto (es el contrato de diseño); NO editar los snapshots GSD a mano.
 2. **Total declarado pero con `value=None` en `order_by(total=...)`**
+   - **RESOLVED:** Interpretación literal de D-05 ("nombre sin match"): el `raise ValueError` del Plan 01-02 Task 2 cubre solo el total ausente; el caso total declarado con `value=None` (p. ej. `avg` sin filas) queda documentado como limitación conocida en Pitfall 4 y candidata a Phase 3 (CORR-06 errores con contexto). No se amplía el fix.
    - What we know: D-05 cubre "total inexistente"; un total declarado con `value=None` (p. ej. `avg` sin filas) seguiría produciendo `TypeError` en la comparación de `sorted()`. `[VERIFIED: code read]`
    - What's unclear: ¿Se considera "inexistente" (cubierto por la política ruidosa) o queda fuera de alcance?
    - Recommendation: Interpretar D-05 literalmente (nombre sin match); documentar el caso None-value como limitación conocida y candidata a Phase 3 (CORR-06 errores con contexto). No ampliar el fix sin confirmación.
 3. **comportamiento esperado del `.0` en floats enteros (Pitfall 3)**
+   - **RESOLVED:** D-01 es explícito (repr round-trip); Plan 01-01 Task 1 añade `test_format_value_precision_whole_float` que documenta `format_value(2.0, Format()) == "2.0"` como comportamiento intencional, y Task 2 lo implementa (branch `decimals=None` con `str(abs(value))`).
    - What we know: `format_value(2.0, Format())` pasará de `'2'` a `'2.0'` (consecuencia directa de D-01).
    - What's unclear: Si algún usuario de la librería depende del `'2'` sin sufijo.
    - Recommendation: Aceptar (decisión D-01 es explícita); añadir un test que documente el nuevo comportamiento como intencional.
