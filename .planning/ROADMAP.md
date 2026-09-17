@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### Milestone v1.1 — Readers multi-formato + Templates HTML/Markdown
 
-- [ ] **Phase 9: Readers multi-formato** - Protocolo `Reader` + registro; readers stdlib (csv/tsv/json/jsonl/tuples) y `excel`; auto-detección de tipos
+- [x] **Phase 9: Readers multi-formato** - Protocolo `Reader` + registro; readers stdlib (csv/tsv/json/jsonl/tuples) y `excel`; auto-detección de tipos (completed 2026-09-17)
 - [ ] **Phase 10: Templates HTML + Markdown** - HTML por clases (sin CSS inline), template de documento, `MarkdownRenderer` + `to_markdown()`
 - *(diferido)* **Streaming de salida** - `to_csv(file=...)`/iteradores (entrada descartada, no-objetivo)
 
@@ -161,10 +161,43 @@ Plans:
 
 - [x] 08-04-PLAN.md — CI jobs `test`+`quality`, triage de mypy y verificación end-to-end de gates (TEST-02)
 
+### Phase 9: Readers multi-formato
+
+**Goal**: `Report` consume fuentes heterogéneas (CSV, TSV, JSON, JSONL, tuplas, Excel) mediante readers registrables, sin tocar el motor ni romper `Report(rows=...)`.
+**Depends on**: Phase 8
+**Requirements**: READ-01, READ-02, READ-03, READ-04, READ-05
+**Success Criteria** (what must be TRUE):
+
+  1. Existe `encino_rpt/readers.py` con protocolo `Reader`, registro `register_reader`/`get_reader`, y readers `csv`/`tsv`/`json`/`jsonl`/`tuples`/`excel`.
+  2. `Report.read('data.csv')` y `Report.read('data.json')` producen un árbol idéntico al de `Report(rows)` con las mismas filas.
+  3. La auto-detección convierte `"100"`→`100`, `"100.5"`→`100.5`, `"true"`→`True`, `""`→`None`, `"N/A"`→`"N/A"`; `coerce=False` deja todo `str`.
+  4. `Report(rows=...)` y `add_dataset` siguen intactos.
+
+**Plans**: 1 plan
+
+Plans:
+**Wave 1**
+
+- [x] 09-01-PLAN.md — Módulo `readers.py` (Reader/registro/_coerce/readers stdlib/excel) + `Report.read`/`register_reader` + `tests/test_readers.py`
+
+### Phase 10: Templates HTML + Markdown
+
+**Goal**: HTML por clases (sin CSS inline), template de documento, y `MarkdownRenderer` + `to_markdown()`.
+**Depends on**: Phase 9
+**Requirements**: TMPL-01, TMPL-02, TMPL-03, TMPL-04
+**Success Criteria** (what must be TRUE): TBD (ver 10-01-PLAN.md)
+
+**Plans**: 1 plan
+
+Plans:
+**Wave 1**
+
+- [ ] 10-01-PLAN.md — Templates HTML + Markdown renderer
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -176,3 +209,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Features | - | Complete (directa) | 2026-09-16 |
 | 7. Refactor | - | Complete (directa) | 2026-09-16 |
 | 8. Tests & CI | 4/4 | Complete   | 2026-09-17 |
+| 9. Readers multi-formato | 1/1 | Complete | 2026-09-17 |
+| 10. Templates HTML + Markdown | 0/1 | Not started | - |

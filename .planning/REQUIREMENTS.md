@@ -58,11 +58,11 @@ Milestone v1.1: Readers multi-formato + Templates HTML/Markdown.
 
 ### Readers
 
-- [ ] **READ-01**: existe un protocolo/ABC `Reader` (`read(source, **opts) -> list[dict]`) y un registro de readers custom (patrón `add_function`/`add_aggregate`).
-- [ ] **READ-02**: readers stdlib incluidos: `csv`, texto delimitado (TSV), `json`, `jsonl`, `tuples` (con `columns=` para mapear posición→nombre).
-- [ ] **READ-03**: reader `excel` (openpyxl) tras el extra `excel`; lanza `ImportError` con hint si falta.
-- [ ] **READ-04**: auto-detección de tipos determinista por celda (`int`→`float`→`bool`→`null`→`str`) con opt-out `coerce=False`; documentado y con test de borde para valores mixtos (p. ej. `"N/A"` queda `str`).
-- [ ] **READ-05**: `Report(rows=...)` y `add_dataset` intactos (compatibilidad total).
+- [x] **READ-01**: existe un protocolo/ABC `Reader` (`read(source, **opts) -> list[dict]`) y un registro de readers custom (patrón `add_function`/`add_aggregate`).
+- [x] **READ-02**: readers stdlib incluidos: `csv`, texto delimitado (TSV), `json`, `jsonl`, `tuples` (con `columns=` para mapear posición→nombre).
+- [x] **READ-03**: reader `excel` (openpyxl) tras el extra `excel`; lanza `ImportError` con hint si falta.
+- [x] **READ-04**: auto-detección de tipos determinista por celda (`int`→`float`→`bool`→`null`→`str`) con opt-out `coerce=False`; documentado y con test de borde para valores mixtos (p. ej. `"N/A"` queda `str`).
+- [x] **READ-05**: `Report(rows=...)` y `add_dataset` intactos (compatibilidad total).
 
 ### Templates / Markdown
 
@@ -117,6 +117,15 @@ Deferred. No en el roadmap actual.
 | JSON-01 | Phase 6 | Pending |
 | TEST-01 | Phase 8 | Complete |
 | TEST-02 | Phase 8 | Complete |
+| READ-01 | Phase 9 | Complete |
+| READ-02 | Phase 9 | Complete |
+| READ-03 | Phase 9 | Complete |
+| READ-04 | Phase 9 | Complete |
+| READ-05 | Phase 9 | Complete |
+| TMPL-01 | Phase 10 | Pending |
+| TMPL-02 | Phase 10 | Pending |
+| TMPL-03 | Phase 10 | Pending |
+| TMPL-04 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total

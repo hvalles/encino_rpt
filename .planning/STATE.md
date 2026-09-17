@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v1.1
 milestone_name: milestone
-status: milestone_complete
-stopped_at: Milestone complete (Phase 08 was final phase)
-last_updated: 2026-09-17T04:37:03.779Z
+status: in_progress
+stopped_at: Executing Phase 09 (09-01 complete)
+last_updated: 2026-09-17T05:32:48Z
 last_activity: 2026-09-17
 progress:
-  total_phases: 8
+  total_phases: 10
   completed_phases: 8
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_plans: 9
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-16)
 
 **Core value:** Producir reportes financieros correctos y seguros — agregación y renderizado exactos, idempotentes y sin inyecciones.
-**Current focus:** Milestone complete
+**Current focus:** Milestone v1.1 — Readers multi-formato + Templates HTML/Markdown
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
-Status: Milestone complete
+Phase: 09
+Plan: 01 complete (Readers multi-formato)
+Status: In progress
 Last activity: 2026-09-17
 
-Progress: [██████████] 100%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -46,6 +46,7 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01 | 3 | - | - |
 | 08 | 4 | - | - |
+| 09 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -57,6 +58,7 @@ Progress: [██████████] 100%
 | Phase 8 P2 | 5min | 3 tasks | 3 files |
 | Phase 08 P03 | 4min | 2 tasks | 22 files |
 | Phase 08 P04 | 11min | 3 tasks | 7 files |
+| Phase 9 P1 | 5min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -76,6 +78,7 @@ Recent decisions affecting current work:
 - [Phase 08]: mypy 2.3.1 confirmado (contingencia 1.20.2 NO necesaria): el plugin pydantic.mypy carga y el triage completa sin pinar 1.x
 - [Phase 08]: disable_error_code=[import-untyped] para openpyxl/reportlab en lugar de # type: ignore por línea: evita fricción con ruff isort (I001) y es el relax justificado que el plan permite
 - [Phase 08]: quality job sin needs (paralelo a test), replicando el patrón multi-job de publish.yml/docs.yml
+- [Phase 09]: `Reader` como `typing.Protocol` (no ABC); `coerce` aplica solo a texto delimitado (csv/tsv) — json/jsonl/tuples/excel preservan tipos ya tipados para no corromper IDs tipo `"001"`.
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T04:21:22.401Z
-Stopped at: Completed 08-tests-ci-04-PLAN.md
+Last session: 2026-09-17T05:32:48Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None
