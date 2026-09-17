@@ -1,7 +1,7 @@
 # encino-rpt
 
 Reporteador financiero sobre `list[dict]`. Convierte filas ya materializadas
-(la salida de `fetch_all` / `fetch_many` / `paginate`) en un **árbol canónico**
+(salida de consultas a base de datos, sin acoplarse al motor) en un **árbol canónico**
 desacoplado del destino, y lo renderiza a HTML, Excel, CSV, PDF o texto plano.
 
 ```python
