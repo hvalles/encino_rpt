@@ -83,7 +83,7 @@ None yet.
 
 ### Blockers/Concerns
 
-None yet.
+- **[Pendiente · infra] Workflow `Docs` falla en `configure-pages@v5`** (GitHub Pages). Preexistente: runs 3–7 todos en `failure`, mientras el paso `Build docs` (mkdocs) sí pasa. Ajeno a la Fase 8 (el CI `test`+`quality` quedó verde). Requiere revisar la config de GitHub Pages (source/permisos) en `.github/workflows/docs.yml` o en los ajustes del repo. No bloquea el milestone.
 
 ## Deferred Items
 
