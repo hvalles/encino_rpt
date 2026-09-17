@@ -2,6 +2,7 @@ import pytest
 
 from encino_rpt import Report
 from encino_rpt.expressions import ExpressionError, evaluate
+from encino_rpt.renderers._sanitize import is_dangerous, sanitize_csv
 from encino_rpt.template import render
 
 
@@ -25,6 +26,35 @@ def test_excel_formula_injection():
     cell = ws["A2"]
     assert cell.value == "=1+1"
     assert cell.data_type == "s"
+
+
+# --- P5: inyección de fórmulas con espacio/BOM ---
+def test_is_dangerous_leading_space_bom():
+    assert is_dangerous(" =1+1") is True
+    assert is_dangerous("\ufeff=1+1") is True
+    assert is_dangerous("\x0c=1+1") is True
+    assert is_dangerous("\ufeff\t=1+1") is True
+    assert is_dangerous("normal") is False
+
+
+def test_sanitize_csv_leading_space_bom():
+    assert sanitize_csv(" =1+1") == "' =1+1"
+    assert sanitize_csv("\ufeff@evil") == "'\ufeff@evil"
+
+
+def test_excel_leading_space_bom():
+    pytest.importorskip("openpyxl")
+    rows = [{"sku": " =1+1", "cantidad": "\ufeff@evil"}]
+    rep = Report(rows)
+    rep.detail("sku", "cantidad")
+    result = rep.run()
+    ws = result.to_excel()
+    cell = ws["A2"]
+    assert cell.value == " =1+1"
+    assert cell.data_type == "s"
+    cell2 = ws["B2"]
+    assert cell2.value == "\ufeff@evil"
+    assert cell2.data_type == "s"
 
 
 # --- P2: DoS en el evaluador ---

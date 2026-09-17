@@ -22,6 +22,34 @@ def test_format_value_number():
     assert format_value(5, None) == "5"
 
 
+def test_format_value_precision_no_sci():
+    assert format_value(1234567.89, Format()) == "1234567.89"
+
+
+def test_format_value_precision_thousands():
+    assert format_value(1234567.89, Format(thousands=True)) == "1,234,567.89"
+
+
+def test_format_value_precision_percent_scale():
+    assert format_value(0.07, Format(kind="percent", percent_scale=True)) == "7%"
+    assert format_value(0.29, Format(kind="percent", percent_scale=True)) == "29%"
+    assert format_value(0.256, Format(kind="percent", percent_scale=True)) == "25.6%"
+
+
+def test_format_value_precision_sci_extremes():
+    assert format_value(1e16, Format()) == "1e+16"
+    assert format_value(0.00001, Format()) == "1e-05"
+
+
+def test_format_value_precision_whole_float():
+    assert format_value(2.0, Format()) == "2.0"
+
+
+def test_format_value_precision_currency():
+    fmt = Format(kind="currency", symbol="$", decimals=None, thousands=True, negative="paren")
+    assert format_value(-1234567.89, fmt) == "($1,234,567.89)"
+
+
 def test_text_renderer():
     rows = [{"agente": "Ana", "monto": 100}, {"agente": "Bob", "monto": 200}]
     rep = Report(rows)
