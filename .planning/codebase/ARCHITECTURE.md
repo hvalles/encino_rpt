@@ -5,37 +5,37 @@
 
 ## System Overview
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Builder / Configuration Layer                    │
-│   `Report` (fluent)  ·  `Section` (facade)  ·  `*Spec` dataclasses   │
-│   `encino_rpt/report.py`  `encino_rpt/section.py`  `encino_rpt/_specs.py` │
-└───────────────┬─────────────────────────────────────────────────────┘
-                │  Report.run()  →  aggregation.build(report)
-                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Aggregation Engine                            │
-│  `aggregation.py` (enrich, partition, group tree, totals, deferred,  │
-│   order/top/suppress, templates, KPIs)                               │
-│  helpers: `expressions.py` `template.py` `charts.py` `pivot.py`      │
-└───────────────┬─────────────────────────────────────────────────────┘
-                │  builds/writes
-                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Canonical Model (pydantic v2)                     │
-│   `ReportResult` → `Group` → `Detail|Group|Chart|Pivot` + `Kpi`      │
-│   `encino_rpt/models.py`  (JSON-serializable, `schema_version`)      │
-└───────────────┬─────────────────────────────────────────────────────┘
-                │  read by visitors
-                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Presentation Layer                            │
-│   `walk()` (shared traversal) + 7 renderers + `_format`/`_sanitize`  │
-│   `encino_rpt/renderers/{html,excel,csv,text,pdf,json,markdown}.py`  │
-└─────────────────────────────────────────────────────────────────────┘
+`encino-rpt` is a financial report generator (a **library**, not a server) that consumes an already-materialized `list[dict]` and produces a canonical serializable tree (`ReportResult`) with optional renderers to HTML, Excel, CSV, PDF, Markdown, JSON and plain text. Aggregation and rendering must be exact, idempotent and injection-safe.
 
-Input side (upstream of the builder):
-   `Report.read()` / `Report(rows)`  ←  `encino_rpt/readers.py` (Reader protocol + registry)
+```text
+┌───────────────────────────────────────────────────────────────────────┐
+│                        Builder / Config layer                         │
+│  Report (fluent)   Section (facade)   *Spec dataclasses   Reader proto │
+│  `encino_rpt/report.py`  `encino_rpt/section.py`  `encino_rpt/_specs.py`│
+│                                     `encino_rpt/readers.py`            │
+└──────────────────────────────┬────────────────────────────────────────┘
+                               │  Report.run() → build(self)
+                               ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                          Engine layer                                  │
+│  aggregation.build() + expressions / template / charts / pivot helpers │
+│  `encino_rpt/aggregation.py`  `encino_rpt/expressions.py`              │
+│  `encino_rpt/template.py`  `encino_rpt/charts.py`  `encino_rpt/pivot.py`│
+└──────────────────────────────┬────────────────────────────────────────┘
+                               │  ReportResult (canonical tree)
+                               ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                    Canonical model layer (stdlib dataclasses)          │
+│  `encino_rpt/models.py`  +  `encino_rpt/_serialize.py` (JSON round-trip)│
+└──────────────────────────────┬────────────────────────────────────────┘
+                               │  ReportResult.to_* / render_* / iter_*
+                               ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                        Renderer layer (visitors)                       │
+│  `encino_rpt/renderers/_walk.py` (shared traversal)                    │
+│  Html / Excel / Csv / Text / Markdown / Pdf / Json renderers           │
+│  + `_format.py` (value formatting) + `_sanitize.py` (OWASP)            │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Responsibilities
@@ -51,7 +51,8 @@ Input side (upstream of the builder):
 | `build()` | Orchestrates `run()`: validate, visible columns, row enrichment, group tree, totals, deferred `TOTAL(...)` resolution, template rendering, KPIs → `ReportResult` | `encino_rpt/aggregation.py` |
 | `build_chart()` | Derives `Chart.labels`/`series` from already-aggregated child groups or the group's own totals | `encino_rpt/charts.py` |
 | `build_pivot()` | Builds a rows × columns cross-tab matrix (`Pivot`) with row/column totals | `encino_rpt/pivot.py` |
-| Pydantic models | Canonical serializable tree: `ReportResult`, `Group`, `Detail`, `Chart`, `Pivot`, `Kpi`, `Total`, `Format`, `Link`, `Image`, `ConditionalRule`, `Series`, `ReportMeta` | `encino_rpt/models.py` |
+| Canonical models | Serializable tree as **stdlib dataclasses**: `ReportResult`, `Group`, `Detail`, `Chart`, `Pivot`, `Kpi`, `Total`, `Format`, `Link`, `Image`, `ConditionalRule`, `Series`, `ReportMeta` | `encino_rpt/models.py` |
+| `to_jsonable()`/`from_dict()` | JSON-native (de)serialization of the dataclass tree without pydantic | `encino_rpt/_serialize.py` |
 | `walk()` | Shared iterative tree traversal; yields typed `(event, node)` tuples consumed by every renderer | `encino_rpt/renderers/_walk.py` |
 | `HtmlRenderer` | Consumes `walk()` → HTML `<table>` with classes, conditional styles, pivot sub-tables, full-document `template` mode | `encino_rpt/renderers/html.py` |
 | `ExcelRenderer` | Consumes `walk()` → openpyxl `Worksheet` (optional dep), native charts, `=SUM(...)` formula mode, cell formatting | `encino_rpt/renderers/excel.py` |
@@ -65,46 +66,42 @@ Input side (upstream of the builder):
 
 ## Pattern Overview
 
-**Overall:** Layered builder → engine → canonical-model → visitor-renderer pipeline.
-
-**Key Characteristics:**
-- Fluent builder API returning `self` for chaining (`report.py`, `section.py`); validation raises early.
-- Spec objects (`_specs.py`) decouple what the user declared from the canonical output — specs are consumed by `build()` and never appear in the result tree.
-- Two-phase total resolution: base totals first, then deferred expressions using `TOTAL("seccion.nombre")` (phase B in `aggregation.py:494-507`).
-- Post-processing phase C: `order_by`, `top(n)`, `suppress_zero` applied after totals are computed, before charts/pivots are appended (`aggregation.py:373-401`).
-- Pydantic v2 models with typed discriminators (`type: Literal[...]`); the recursive `Group.children` union is resolved via `Group.model_rebuild()` (`models.py:368`).
-- Shared iterative `walk()` generator centralizes the visitor traversal that each renderer consumes (`renderers/_walk.py`).
-- All renderers expose both a `render()` (materialized) and an `iter_*`/`write()` (streaming) path; `ReportResult` mirrors this with `to_*`/`render_*` and `iter_*`/`file=` methods.
-- Lazy imports for all optional renderer dependencies (`openpyxl`, `reportlab`) and for the engine (`aggregation`) / renderers / readers to break import cycles.
-- In-memory aggregation engine; heavy aggregates are a documented non-goal (delegated to SQL `ROLLUP`/`CUBE`).
+- **Fluent builder** returning `self` (or `Section`) for chaining; validation raises early (`report.py`, `section.py`).
+- **Spec decoupling**: `*Spec` dataclasses (`_specs.py`) record what the user declared; `build()` maps them to canonical `models.py` types that never appear in the builder.
+- **Canonical tree is stdlib `@dataclass`** (NOT pydantic). The recursive `Group.children` union (`list[Detail | Group | Chart | Pivot]`) is resolved at deserialization time by a `type` discriminator dispatch map (`_NODES` in `encino_rpt/_serialize.py:17-22`).
+- **Two-phase total resolution**: base totals computed per group first, then deferred expressions using `TOTAL("seccion.nombre")` resolved in phase B (`encino_rpt/aggregation.py:494-507`).
+- **Post-processing phase C**: `order_by`, `top(n)`, `suppress_zero` applied after totals are computed, before charts/pivots are appended (`encino_rpt/aggregation.py:373-401`).
+- **Shared iterative `walk()` generator** centralizes the visitor traversal that every renderer consumes (`encino_rpt/renderers/_walk.py`).
+- **Streaming renderers**: each renderer exposes `render()` (materialized) + `iter_*` (generator) + `write(result, file)`; `ReportResult` mirrors this with `to_*`/`render_*` (and `file=` params) plus `iter_*` convenience methods (`encino_rpt/models.py:204-419`).
+- **Lazy imports** for all optional renderer dependencies (`openpyxl`, `reportlab`) and for the engine (`aggregation`) / renderers / readers to break import cycles.
+- **In-memory aggregation engine**; heavy aggregates are a documented non-goal (delegated to SQL `ROLLUP`/`CUBE`).
+- **Module-level dispatch dicts** (`_BINOPS`, `_CMP`, `_OPS`, `_COLOR_OPS`, `_FORMAT_BY_EXT`) instead of if/else chains.
 
 ## Layers
 
-**Builder / Configuration Layer:**
+**Builder / Config:**
 - Purpose: Declarative configuration of a report plus multi-format input.
 - Location: `encino_rpt/report.py`, `encino_rpt/section.py`, `encino_rpt/_specs.py`, `encino_rpt/readers.py`.
 - Contains: The `Report` builder, the `Section` facade, internal `*Spec` dataclasses, and the `Reader` protocol + registry.
 - Depends on: `encino_rpt/_specs.py`, `encino_rpt/models.py` (only `Format`, `ConditionalRule`, `ReportResult` for type hints), and lazily on `encino_rpt/readers.py` (inside `Report.read`) and `encino_rpt/aggregation.py` (inside `Report.run`).
 - Used by: application code (see `README.md` examples).
 
-**Aggregation Engine Layer:**
+**Engine:**
 - Purpose: Enrich rows, build the group hierarchy, compute totals, assemble `ReportResult`.
 - Location: `encino_rpt/aggregation.py` (helpers `expressions.py`, `template.py`, `charts.py`, `pivot.py`).
 - Contains: `build(report)`, `_validate`, `_visible_columns`, `_enrich`, `_partition`, `_build_group_tree`, `_build_group`, `_build_instance`, `_build_path_group`, `_compute_totals_into`, `_resolve_deferred`, `_apply_order`, `_render_templates`, `_build_kpis`.
 - Depends on: all `*Spec` types, all model types, `evaluate`, `render_template`, `build_chart`, `build_pivot`.
-- Used by: only `Report.run()` (`encino_rpt/report.py:413-421`).
+- Used by: only `Report.run()` (`encino_rpt/report.py:426-434`).
 
-**Canonical Model Layer:**
+**Canonical model + serialization:**
 - Purpose: Typed, JSON-serializable representation of the report result.
-- Location: `encino_rpt/models.py`.
-- Contains: 13 pydantic models (see Component Responsibilities table).
-- Depends on: `pydantic>=2` only.
-- Used by: the engine (writes), the renderers (read), and downstream consumers (`model_dump()` / `model_validate()` / `to_json()`).
+- Location: `encino_rpt/models.py` (13 dataclasses) + `encino_rpt/_serialize.py`.
+- Depends on: stdlib only (`dataclasses`, `typing`, `datetime`, `decimal`, `enum`).
+- Used by: the engine (writes), the renderers (read), and downstream consumers (`to_dict()` / `from_dict()` / `to_json()` / `from_json()`).
 
-**Presentation / Renderer Layer:**
+**Renderer:**
 - Purpose: Convert the canonical tree to a concrete output format.
 - Location: `encino_rpt/renderers/` (`html.py`, `excel.py`, `csv.py`, `text.py`, `pdf.py`, `json.py`, `markdown.py`, `_walk.py`, `_format.py`, `_sanitize.py`).
-- Contains: Visitor-style renderer classes + shared walker/formatting/sanitizing helpers.
 - Depends on: `encino_rpt/models.py`; `openpyxl` and `reportlab` only inside `excel.py`/`pdf.py` (optional extras).
 - Used by: `ReportResult` convenience methods and end users.
 
@@ -112,79 +109,88 @@ Input side (upstream of the builder):
 
 ### Primary Request Path (build a report)
 
-1. **Input** — `Report.read(source, format=...)` (`encino_rpt/report.py:44-78`) delegates to `readers.read()` (`encino_rpt/readers.py:350-371`), which resolves the reader by name or file extension and returns `list[dict]`. `Report(rows)` (`report.py:19`) remains the direct path.
-2. **Declare** — fluent builder methods (`group()`, `detail()`, `add_field()`, `total()` via `Section`, `kpi()`, etc.) populate `FieldSpec`/`GroupSpec`/`KpiSpec` instances.
-3. **Run** — `Report.run()` (`report.py:413-421`) lazily imports `aggregation.build` and calls `build(self)`.
-4. **Build** — `build()` (`aggregation.py:586-621`): `_validate` → `_visible_columns` → `_enrich` (per source) → `_build_group_tree` → `_build_group`/`_build_instance` (partition, totals base, phase-C order/top/suppress, charts/pivots) → `_resolve_deferred` (phase B) → `_render_templates` → `_build_kpis`.
-5. **Result** — a `ReportResult` is returned with `meta`, `columns`, `formats`, `styles`, `kpis`, and `root`.
+1. `Report(rows, params, title)` stores config in private instance attrs (`encino_rpt/report.py:19-42`).
+2. Builder methods mutate `self._fields` / `self._groups` / `self._styles` / etc., each returning `self` or a `Section`.
+3. `Report.run()` (`encino_rpt/report.py:426`) lazily imports and calls `aggregation.build(self)`.
+4. `build()` validates (`_validate`), computes visible columns (`_visible_columns`), and enriches every source dataset (`_enrich` → `evaluate`/template for `expr`/`link`/`image` fields) — `encino_rpt/aggregation.py:586-593`.
+5. `_build_group_tree` resolves the root spec + parent→children map; `_build_group` partitions rows (`_partition`) and recursively builds `Group`/`Detail` nodes, computing base totals and registering deferred `TOTAL(...)` totals (`aggregation.py:215-403`).
+6. `_resolve_deferred` resolves phase-B totals with a `TOTAL` function bound to the cross-group registry (`aggregation.py:494-507`).
+7. `_render_templates` walks the tree and renders header/footer templates with the final total context (`aggregation.py:511-529`).
+8. `build()` returns a `ReportResult` with `meta`, `columns`, `formats`, `styles`, `kpis`, `root` (`aggregation.py:614-621`).
 
-### Secondary Flow (render to a destination)
+### Secondary Flow (read → report)
 
-1. Call `result.to_csv()` / `render_html()` / `to_markdown()` / `to_excel()` / `to_json()` / `to_pdf()` (`encino_rpt/models.py:150-365`) — each lazily imports the matching renderer.
-2. Pass `file=` to any text renderer (`html`, `csv`, `text`, `markdown`, `pdf`) to stream directly instead of returning a string/bytes; call `iter_html()` / `iter_csv()` / `iter_text()` / `iter_markdown()` (`models.py:192-315`) to consume fragments lazily.
-3. The renderer constructs itself and calls `render(self)` (materialized) or `write(self, file)` (streaming); both delegate to an `iter_*` generator that consumes `walk(root)`.
+1. `Report.read(source, format, coerce, columns, ...)` (`encino_rpt/report.py:44-78`) delegates to `readers.read`.
+2. `readers.read` resolves the reader via `_resolve_format` (explicit `format=` or file extension) and dispatches through `get_reader` (`encino_rpt/readers.py:350-371`).
+3. The reader returns `list[dict]`, which `Report.read` passes to `cls(rows, ...)`.
+
+### Render Flow
+
+1. End user calls `result.to_html()` / `to_csv()` / `iter_html()` / etc. (`encino_rpt/models.py`).
+2. The method lazy-imports the matching renderer and delegates to `render()` (string) or `write(result, file)` (streaming), or `iter_*` (generator).
+3. Each renderer consumes `walk(result.root)` (`encino_rpt/renderers/_walk.py`) and emits its format.
 
 **State Management:**
 - All builder state lives in instance attributes of `Report` (`self._fields`, `self._groups`, `self._detail`, `self._datasets`, etc. — `encino_rpt/report.py:29-42`); no module-level mutable state except the reader registry (`_READERS` in `encino_rpt/readers.py:35`).
 - Engine state (`registry`, `deferred`, `sources`) is local to `build()` (`aggregation.py:603-604`) and threaded through private helper parameters.
-- `Group` carries private, non-serialized context for late template rendering: `_first_row`, `_header_tpl`, `_footer_tpl` via pydantic `PrivateAttr` (`encino_rpt/models.py:123-126`).
+- `Group` carries private, non-serialized context for late template rendering: `_first_row`, `_header_tpl`, `_footer_tpl`, set as plain instance attrs in `Group.__post_init__` (`encino_rpt/models.py:133-138`), replicating the former pydantic `PrivateAttr`.
 - A fresh `Report` instance is required per report — `run()` does not reset the builder.
 
 ## Key Abstractions
 
 **`ReportResult` (canonical tree):**
 - Purpose: The serializable contract between engine and presentation; pure data.
-- Location: `encino_rpt/models.py:136-365`.
-- Pattern: pydantic `BaseModel` with typed children (`root: Group`), convenience render methods with lazy imports, `to_json` with `schema_version`.
-- Serialization: `model_dump()` / `model_validate()` round-trip verified in `tests/test_report.py`.
+- Location: `encino_rpt/models.py:149-419`.
+- Pattern: stdlib `@dataclass` with `root: Group` plus `meta`, `columns`, `formats`, `styles`, `kpis`; convenience render methods with lazy imports; `to_dict`/`from_dict`/`from_json` for round-trip.
+- Serialization: `to_dict()` → `to_jsonable(self)`; `from_dict(data)` → `_build(ReportResult, data)` (round-trip verified in `tests/test_report.py`).
 
-**`*Spec` + `Section` (builder spec):**
+**`GroupSpec` + `Section`:**
 - Purpose: `GroupSpec` records what a cut (group) declares; `Section` is the public handle that mutates it. Specs are mapped to canonical models during `build()` and never appear in the output tree.
 - Location: `encino_rpt/_specs.py:75-93`, `encino_rpt/section.py`.
-- Pattern: dataclass spec mutated via fluent facade; `group()` returns a `Section`, `section(name)` re-opens it (`report.py:347-411`).
+- Pattern: dataclass spec mutated via fluent facade; `group()` returns a `Section`, `section(name)` re-opens it (`encino_rpt/report.py:360-424`).
 
-**`evaluate()` (safe expression evaluator):**
+**Expression evaluator:**
 - Purpose: Computed fields, conditional totals, and ordering expressions.
 - Location: `encino_rpt/expressions.py:55-123`.
 - Pattern: `ast.parse(mode="eval")` + strict whitelist walk (`_walk`, `expressions.py:67-123`); no `eval`.
 - Safety: `_MAX_NODES=1000`, `_MAX_DEPTH=100`, `_MAX_POW_EXP=10000` (`expressions.py:46-48`).
 
-**`walk()` (shared traversal):**
+**Tree walker:**
 - Purpose: Uniform tree walking across all output formats.
 - Location: `encino_rpt/renderers/_walk.py`.
 - Pattern: iterative generator `walk(root)` yielding `("group_start", Group)`, `("group_end", Group)`, `("detail", Detail)`, `("chart", Chart)`, `("pivot", Pivot)` in document order, with an explicit closing marker so renderers can emit totals/footer after children.
 - Extension: add a new renderer class that consumes `walk()` and implement `render(result)` + `iter_*`/`write(result, file)`; register it in `encino_rpt/renderers/__init__.py`.
 
-**`Reader` protocol + registry:**
+**Readers + registry:**
 - Purpose: Multi-format input to `list[dict]`, decoupled from `Report`.
 - Location: `encino_rpt/readers.py`.
 - Pattern: `Reader` is a `typing.Protocol` with `read(source, **opts) -> list[dict]`; `register_reader(name, reader)` mutates the module-level `_READERS` dict; `read()` resolves the name via `_resolve_format` (explicit `format=` or file extension) and dispatches through `get_reader()`. Six built-in readers are registered at import (`readers.py:375-380`).
-- Extension: `Report.register_reader(name, reader)` (`report.py:80-90`) delegates here; custom readers are any object with a `read(source, **opts)` method.
+- Extension: `Report.register_reader(name, reader)` (`encino_rpt/report.py:80-90`) delegates here; custom readers are any object with a `read(source, **opts)` method.
 
-**Path-group trie:**
+**Path hierarchy (trie):**
 - Purpose: Group rows by a dotted path column (`"1.2.3"`) into a nested hierarchy without recursion-depth limits.
 - Location: `encino_rpt/aggregation.py:270-331` (`_PathNode`, `_make_path_node`, `_segs`).
 - Pattern: iterative trie built once per row (split cached), then expanded to `Group` nodes via an explicit stack.
 
 ## Entry Points
 
-**Public package API:**
+**Package import:**
 - Location: `encino_rpt/__init__.py`.
 - Triggers: `from encino_rpt import Report, ReportResult, Group, Total, Reader, ...`.
-- Responsibilities: re-export the builder, canonical model types, and `Reader` protocol; `__all__` lists 15 public names (`__init__.py:21-36`). `Section` is intentionally NOT exported (reachable via `Report.group()`/`Report.section()`).
+- Responsibilities: re-export the builder, canonical model types, and `Reader` protocol; `__all__` lists 15 public names (`__init__.py:21-37`). `Section` is intentionally NOT exported (reachable via `Report.group()`/`Report.section()`).
 
 **`Report.run()`:**
-- Location: `encino_rpt/report.py:413-421`.
+- Location: `encino_rpt/report.py:426-434`.
 - Triggers: user call after declaring the report.
 - Responsibilities: materialize the canonical `ReportResult` by delegating to `aggregation.build(self)`.
 
-**`Report.read()` / `Report.register_reader()`:**
+**`Report.read()` / `register_reader()`:**
 - Location: `encino_rpt/report.py:44-90`.
 - Triggers: user call to build a `Report` from a file/file-like/raw source, or to register a custom reader.
 - Responsibilities: delegate to `encino_rpt/readers.py`.
 
 **`ReportResult` convenience methods:**
-- Location: `encino_rpt/models.py:150-365` (`render_html`, `to_csv`, `to_text`, `to_markdown`, `to_excel`, `to_json`, `to_pdf`, plus `iter_html`/`iter_csv`/`iter_text`/`iter_markdown`).
+- Location: `encino_rpt/models.py:150-419` (`render_html`, `to_csv`, `to_text`, `to_markdown`, `to_excel`, `to_json`, `to_pdf`, plus `iter_html`/`iter_csv`/`iter_text`/`iter_markdown`).
 - Triggers: end-user call on the result.
 - Responsibilities: lazy-import the matching renderer and delegate; never mutate the tree.
 
@@ -195,61 +201,63 @@ Input side (upstream of the builder):
 
 ## Architectural Constraints
 
-- **Threading:** Single-threaded, in-memory aggregation. No threads, no async. The reader registry `_READERS` (`readers.py:35`) is the only module-level mutable state, and it is write-once-at-import plus user `register_reader` calls.
-- **Global state:** `ExcelRenderer` stores transient mutable state on `self` (`_ws`, `_result`, `_formulas`, `_row` — `renderers/excel.py:51-54`), making it non-reentrant across concurrent renders of the same instance. `PdfRenderer` sets `self._normal` during `render` (`renderers/pdf.py:51`).
-- **Circular imports:** Avoided via lazy imports. `report.py` imports `aggregation.py` lazily inside `run()` (`report.py:419`) and `readers.py` lazily inside `read()`/`register_reader()` (`report.py:75,88`); `models.py` imports renderers lazily inside convenience methods (`models.py:178-363`). `aggregation.py` imports `expressions.py`, `template.py`, `charts.py`, `pivot.py`, `models.py`, `_specs.py` at top level — one direction, no cycles.
-- **No `eval`:** All expressions go through the AST whitelist walker (`expressions.py`). `ast.parse` node/depth/pow counts are capped to prevent DoS.
-- **Optional dependencies isolated:** `openpyxl` is imported only inside `ExcelRenderer.render` (`renderers/excel.py:40-46`) and `ExcelReader.read` (`readers.py:295-300`); `reportlab` only inside `PdfRenderer.render` (`renderers/pdf.py:35-48`). All raise `ImportError` with a hint to install the `excel`/`pdf` extras.
+- **Threading:** Single-threaded, in-memory aggregation. No threads, no async. The reader registry `_READERS` (`encino_rpt/readers.py:35`) is the only module-level mutable state, and it is write-once-at-import plus user `register_reader` calls.
+- **Global state:** `ExcelRenderer` stores transient mutable state on `self` (`_ws`, `_result`, `_formulas`, `_row` — `encino_rpt/renderers/excel.py:51-54`), making it non-reentrant across concurrent renders of the same instance. `PdfRenderer` sets `self._normal` during `render` (`encino_rpt/renderers/pdf.py:51`).
+- **Circular imports:** Avoided via lazy imports. `report.py` imports `aggregation.py` lazily inside `run()` (`report.py:432`) and `readers.py` lazily inside `read()`/`register_reader()` (`report.py:75,88`); `models.py` imports renderers lazily inside convenience methods (`models.py:232-417`) and `_serialize` lazily inside `to_dict`/`from_dict`. `aggregation.py` imports `expressions.py`, `template.py`, `charts.py`, `pivot.py`, `models.py`, `_specs.py` at top level — one direction, no cycles.
+- **No `eval`:** All expressions go through the AST whitelist walker (`encino_rpt/expressions.py`). `ast.parse` node/depth/pow counts are capped to prevent DoS.
+- **Optional dependencies isolated:** `openpyxl` is imported only inside `ExcelRenderer.render` (`encino_rpt/renderers/excel.py:40-46`) and `ExcelReader.read` (`encino_rpt/readers.py:295-300`); `reportlab` only inside `PdfRenderer.render` (`encino_rpt/renderers/pdf.py:35-48`). All raise `ImportError` with a hint to install the `excel`/`pdf` extras.
 - **Python version:** `requires-python = ">=3.10"` (`pyproject.toml:13`); CI matrix runs 3.10–3.13. Code uses `from __future__ import annotations` throughout.
-- **Pydantic forward references:** `Group.children` is a recursive union, resolved with `Group.model_rebuild()` at the bottom of `encino_rpt/models.py:368`.
+- **No pydantic at runtime:** The model layer is stdlib `@dataclass`; serialization is hand-rolled in `encino_rpt/_serialize.py`. The recursive `Group.children` union is deserialized via the `_NODES` discriminator map keyed on each node's `type` field (`_serialize.py:17-22`).
 
 ## Anti-Patterns
 
 ### Tight coupling between `aggregation.py` and private `Report` attributes
 
-**What happens:** `build()` and its helpers read `report._rows`, `report._datasets`, `report._fields`, `report._groups`, `report._functions`, etc. directly (`aggregation.py:135,168,565-583`).
-**Why it's wrong:** The engine depends on the builder's private implementation details; renaming an attribute on `Report` silently breaks aggregation.
-**Do this instead:** Keep reading `_`-prefixed attributes in `aggregation.py` only — it is the sole consumer of the builder's internal state, and this coupling is intentional and documented. When adding a new builder feature, add a corresponding read in `_validate`, `_enrich`, or `_build_*` in the same change.
+**What happens:** The engine reads `report._rows`, `report._fields`, `report._groups`, `report._datasets`, `report._functions`, `report._aggregates`, `report._kpis`, `report._detail`, `report._detail_source`, `report._order` directly (`encino_rpt/aggregation.py:134-621`), rather than going through `Report` accessors.
+**Why it's wrong:** Any rename of a private `Report` attribute silently breaks the engine; there is no interface contract beyond "both files know the same names."
+**Do this instead:** Keep the spec dataclasses as the boundary — if you add builder state, add a corresponding `*Spec` field (or a typed accessor on `Report`) and read it through `_specs.py` rather than reaching into `report._*`.
 
 ### Charts/pivots appended after phase-C ordering
 
-**What happens:** `node.children = _apply_order(...)` runs first, then charts/pivots are appended with `node.children = node.children + extras` (`aggregation.py:374-401`).
-**Why it's wrong:** Ordering/top/suppress must not reorder or drop charts/pivots relative to detail/groups; mixing them would corrupt the document order that `walk()` relies on.
-**Do this instead:** Always append charts/pivots after `_apply_order`, exactly as `_build_instance` does. Do not pass `extras` into `_apply_order`.
+**What happens:** `_apply_order` (order/top/suppress_zero) runs on `node.children` **before** charts/pivots are appended (`encino_rpt/aggregation.py:373-401`).
+**Why it's wrong:** Charts/pivots can never be reordered or filtered by `order_by`/`top`/`suppress_zero`; they are always last. This is intentional but surprising if you assume ordering applies to all children.
+**Do this instead:** Preserve this invariant — charts/pivots are always emitted after ordered child groups. Document that ordering only affects `Group`/`Detail` children.
 
 ### Duplicated operator/conditional tables per renderer
 
-**What happens:** `_OPS` (html), `_COLOR_OPS` (excel), and the `_BINOPS`/`_CMP` dicts in `expressions.py` each re-declare the same comparison operators.
-**Why it's wrong:** New comparison operators or conditional styles must be added in multiple places, risking divergence.
-**Do this instead:** When adding a comparison operator, update both `expressions._CMP` and the renderer `_OPS`/`_COLOR_OPS` tables. Consider extracting a shared table if a third consumer appears.
+**What happens:** `_OPS` (`encino_rpt/renderers/html.py:13-20`), `_COLOR_OPS` (`encino_rpt/renderers/excel.py:10-17`) and the expression `_CMP` (`encino_rpt/expressions.py:22-29`) each re-implement the same `lt/le/gt/ge/eq/ne` comparison semantics.
+**Why it's wrong:** Adding a comparison operator means editing three files; drift between them introduces inconsistent conditional styling.
+**Do this instead:** Prefer a single shared comparison helper (e.g. in a small shared module) when touching conditional styling; at minimum, keep the three tables in sync.
 
 ### Reimplementing tree traversal per renderer
 
-**What happened (historical):** Renderers previously duplicated traversal logic.
-**Why it's wrong:** Traversal order bugs (e.g., totals emitted before children, or footer before totals) had to be fixed in every renderer separately.
-**Do this instead:** All renderers now consume the single `walk()` generator in `encino_rpt/renderers/_walk.py`. New renderers must import `walk` and handle `group_start`/`group_end`/`detail`/`chart`/`pivot`, never write their own recursion.
+**What happens:** Some renderers maintain their own `depth`/`pending` state on top of `walk()` (e.g. `MarkdownRenderer._walk_lines` — `markdown.py:112-148`), while `walk()` already yields the events.
+**Why it's wrong:** Custom state machines per renderer are error-prone and duplicate what `walk()` provides.
+**Do this instead:** Consume `walk()` events directly; introduce renderer-local state only when the format truly needs buffering (as Markdown does to batch detail rows into one table).
 
 ## Error Handling
 
-**Strategy:** Fail fast with contextual `ValueError` subclasses; never swallow exceptions in the engine.
-
-- Builder validation: `group()` raises `ValueError` when `columns` and `path` are both set (`report.py:375-376`) and on duplicate cut names (`report.py:377-378`); `section()` raises `KeyError` for undeclared cuts (`report.py:408-410`); `Section.order_by` raises `ValueError` for invalid direction (`section.py:163-164`).
-- Reader errors: `get_reader()` raises `ValueError` for unregistered readers (`readers.py:60-63`); `read()` raises `ValueError` when the format can't be resolved (`readers.py:347`); `TuplesReader` raises `ValueError` when `columns` is missing or mismatched (`readers.py:264-273`); JSON/JSONL readers raise `TypeError` for non-list/non-dict payloads.
-- Engine context wrapping: `_wrap()` re-raises any error as `AggregationError` with a `{context}: ...` prefix (`aggregation.py:35-44`).
-- Expression errors: `ExpressionError(ValueError)` for unknown names, unsafe nodes, complexity/depth/pow limits (`expressions.py:51-123`).
-- Template errors: `ValueError` for non-numeric `param.` indexes, `IndexError` for out-of-range params, `KeyError` for unresolved tokens (`template.py:20-31`).
-- Aggregate errors: `ValueError` for unknown operators (`aggregation.py:69`); `AggregationError` for unregistered custom aggregates (`aggregation.py:87`, `574-575`).
-- Optional dependency errors: `ImportError` with install hints for `openpyxl`/`reportlab` (`renderers/excel.py:44-46`, `renderers/pdf.py:45-48`, `readers.py:297-300`) — covered by `pytest.importorskip` in tests.
-- Serialization errors: `JsonRenderer.to_dict`/`render` convert deep-recursion `RecursionError` into a controlled `ValueError` (`renderers/json.py:32-55`).
-- Aggregation never catches exceptions: a failing expression propagates up through `run()` to the caller.
+- **Builder validation:** `group()` raises `ValueError` when `columns` and `path` are both set (`report.py:388-389`) and on duplicate cut names (`report.py:390-391`); `section()` raises `KeyError` for undeclared cuts (`report.py:421-423`); `Section.order_by` raises `ValueError` for invalid direction (`section.py:163-164`).
+- **Reader errors:** `get_reader()` raises `ValueError` for unregistered readers (`readers.py:60-63`); `read()` raises `ValueError` when the format can't be resolved (`readers.py:347`); `TuplesReader` raises `ValueError` when `columns` is missing or mismatched (`readers.py:264-273`); JSON/JSONL readers raise `TypeError` for non-list/non-dict payloads.
+- **Engine context wrapping:** `_wrap()` re-raises any error as `AggregationError` with a `{context}: ...` prefix (`encino_rpt/aggregation.py:35-44`).
+- **Expression errors:** `ExpressionError(ValueError)` for unknown names, unsafe nodes, complexity/depth/pow limits (`encino_rpt/expressions.py:51-123`).
+- **Template errors:** `ValueError` for non-numeric `param.` indexes, `IndexError` for out-of-range params, `KeyError` for unresolved tokens (`encino_rpt/template.py:20-31`).
+- **Aggregate errors:** `ValueError` for unknown operators (`aggregation.py:69`); `AggregationError` for unregistered custom aggregates (`aggregation.py:87`, `575`).
+- **Optional dependency errors:** `ImportError` with install hints for `openpyxl`/`reportlab` (`renderers/excel.py:43-46`, `renderers/pdf.py:45-48`, `readers.py:297-300`) — covered by `pytest.importorskip` in tests.
+- **Serialization errors:** `JsonRenderer.render`/`to_dict` convert deep-recursion `RecursionError` into a controlled `ValueError` (`renderers/json.py:34-51`).
+- **Aggregation never catches exceptions:** a failing expression propagates up through `run()` to the caller.
 
 ## Cross-Cutting Concerns
 
-**Logging:** None — no `logging` module usage anywhere in `encino_rpt/`; the library is silent and relies on raised exceptions.
-**Validation:** Split between the builder (`report.py`, `section.py` — immediate) and `_validate` (`aggregation.py:564-583` — at `run()` time, for cross-cutting checks like undeclared `source`/`parent`).
-**Authentication:** Not applicable — pure in-memory library; no network, no auth.
-**Security:** Formula-injection mitigation centralizes in `renderers/_sanitize.py`; HTML escaping in `renderers/html.py` (`_esc`, `_SAFE_PROP`, `_UNSAFE_VALUE`); expression safety in `expressions.py` (no `eval`, AST whitelist, DoS caps).
-**Streaming:** Every text renderer exposes `render()` (materialized), `iter_*` (generator), and `write(result, file)`; `ReportResult` mirrors with `to_*`/`render_*`, `iter_*`, and `file=` params.
+**Logging:** None. The library uses no logging framework — errors propagate as exceptions; there is no `logging` import anywhere in `encino_rpt/`.
+
+**Validation:** Split between the builder (early, fluent `ValueError`/`KeyError`) and the engine (`_validate` in `encino_rpt/aggregation.py:564-583`, which checks `source`/`parent`/`custom:` references across groups, fields, detail and KPIs before aggregation).
+
+**Authentication:** None. The library is pure and stateless; no network, auth, or secrets handling.
+
+**Security:** Two dedicated subsystems — the AST-whitelist expression evaluator (`encino_rpt/expressions.py`) and OWASP formula-injection mitigation (`encino_rpt/renderers/_sanitize.py`, applied in CSV via `sanitize_csv` and in Excel via `write_excel_cell`). HTML escaping is applied via `html.escape` in `html.py`/`pdf.py`.
+
+**Serialization:** `encino_rpt/_serialize.py` handles dataclass→JSON-native conversion (`to_jsonable`) and reverse (`from_dict` via `get_type_hints` + `_coerce`), including `Decimal`→str, `datetime`/`date`/`time`→isoformat, `Enum`→value, and recursive-union dispatch via the `type` discriminator.
 
 ---
 
