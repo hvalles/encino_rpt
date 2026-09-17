@@ -14,14 +14,14 @@ updated: 2026-09-17T04:15:00Z
 
 ### 1. CI end-to-end verde (GitHub Actions)
 expected: Al hacer push, los jobs `test` (matrix 3.10–3.13) y `quality` (singleton 3.13: mypy + `ruff format --check` + gate de cobertura ≥80) quedan verdes en la pestaña Actions.
-result: [pending]
+result: passed (run 35182174434 → success, commit c590eac)
 
 ## Summary
 
 total: 1
-passed: 0
+passed: 1
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
