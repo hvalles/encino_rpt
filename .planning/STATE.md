@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-tests-ci-01-PLAN.md
-last_updated: "2026-09-17T03:54:34.957Z"
+stopped_at: Completed 08-tests-ci-02-PLAN.md
+last_updated: "2026-09-17T04:00:30.104Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
   percent: 13
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 ## Current Position
 
 Phase: 08 (Tests & CI) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [██████░░░░] 57%
 
 *Updated after each plan completion*
 | Phase 8 P1 | 8min | 2 tasks | 1 files |
+| Phase 8 P2 | 5min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 - Quitar `encino-orm`: dependencia de runtime sin uso.
 - Añadir renderer JSON con schema versionado.
 - [Phase 8]: Los bugs no-corregidos del engine se documentan con tests de regresión (assert comportamiento actual + comentario # CONCERNS.md), no se corrigen en esta fase
+- [Phase 8]: Los bugs no-corregidos (JSON profundo, params muertos Excel, null byte) se documentan con assert del comportamiento actual + comentario # CONCERNS.md; TEST-02 no se marca completo (08-02 solo aporta el gate de smoke de rendimiento)
 
 ### Pending Todos
 
@@ -85,6 +87,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T03:54:34.947Z
-Stopped at: Completed 08-tests-ci-01-PLAN.md
+Last session: 2026-09-17T04:00:30.092Z
+Stopped at: Completed 08-tests-ci-02-PLAN.md
 Resume file: None

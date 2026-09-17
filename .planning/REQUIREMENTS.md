@@ -49,7 +49,7 @@ Requirements para el hardening + features. Cada uno mapea a una fase del roadmap
 
 ### Testing
 
-- [ ] **TEST-01**: hay tests de regresión para cada uno de los fixes anteriores (idempotencia, precisión, SUM, sanitización, `order_by`, errores con contexto, multi-dataset, Link/Image, jerarquías profundas).
+- [x] **TEST-01**: hay tests de regresión para cada uno de los fixes anteriores (idempotencia, precisión, SUM, sanitización, `order_by`, errores con contexto, multi-dataset, Link/Image, jerarquías profundas).
 - [ ] **TEST-02**: CI incluye type checker, `ruff format --check`, gate de cobertura y smoke test de rendimiento con entradas grandes.
 
 ## v2 Requirements
@@ -92,7 +92,7 @@ Deferred. No en el roadmap actual.
 | REF-02 | Phase 7 | Pending |
 | DEP-01 | Phase 1 | Pending |
 | JSON-01 | Phase 6 | Pending |
-| TEST-01 | Phase 8 | Pending |
+| TEST-01 | Phase 8 | Complete |
 | TEST-02 | Phase 8 | Pending |
 
 **Coverage:**
