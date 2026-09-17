@@ -25,9 +25,20 @@ _UNSAFE_VALUE = _re.compile(r"[;{}\x00-\x1f\x7f]")
 class HtmlRenderer:
     """Renderiza el `ReportResult` a una tabla HTML con clases y formato condicional."""
 
-    def __init__(self, classes: dict | None = None, repeat_header: bool = False):
+    def __init__(
+        self,
+        classes: dict | None = None,
+        repeat_header: bool = False,
+        *,
+        css: bool = False,
+        template: bool = False,
+        title: str | None = None,
+    ):
         self.classes = classes or {}
         self.repeat_header = repeat_header
+        self.css = css
+        self.template = template
+        self.title = title
 
     def render(self, result) -> str:
         """Convierte el resultado a HTML.
@@ -36,9 +47,12 @@ class HtmlRenderer:
             result: El `ReportResult` a renderizar.
 
         Returns:
-            La tabla HTML como cadena.
+            La tabla HTML como cadena (o el documento completo si `template`).
         """
-        parts = ["<table>"]
+        parts = []
+        if self.css:
+            parts.append(_style_block(result))
+        parts.append("<table>")
         if result.columns:
             header = "".join(f"<th>{_esc(c)}</th>" for c in result.columns)
             parts.append(f"<thead><tr>{header}</tr></thead>")
@@ -87,7 +101,7 @@ class HtmlRenderer:
                 cells = []
                 for c in result.columns:
                     value = node.row.get(c)
-                    attrs = self._cell_attrs(c, value, result.styles)
+                    attrs = self._cell_attrs(c, value, result)
                     cells.append(
                         f"<td{attrs}>{self._cell_content(c, value, result)}</td>"
                     )
@@ -144,16 +158,15 @@ class HtmlRenderer:
             return f"<img{attrs}/>"
         return _esc(format_value(value, result.formats.get(column)))
 
-    def _cell_attrs(self, column, value, rules) -> str:
-        style = {}
-        for r in rules:
-            if r.column is not None and r.column != column:
-                continue
-            if value is None:
-                continue
-            op = _OPS.get(r.when)
-            if op is not None and op(value, r.value):
-                style.update(r.style)
+    def _cell_attrs(self, column, value, result) -> str:
+        matched = _matched_rules(column, value, result.styles)
+        if self.css:
+            if not matched:
+                return ""
+            return f' class="{" ".join(f"rpt-cond-{i}" for i in matched)}"'
+        style: dict = {}
+        for i in matched:
+            style.update(result.styles[i].style)
         return _style_attr(style)
 
 
@@ -161,22 +174,54 @@ def _esc(text) -> str:
     return _html.escape(str(text))
 
 
-def _style_attr(style) -> str:
+def _matched_rules(column, value, rules) -> list[int]:
+    matched: list[int] = []
+    for i, r in enumerate(rules):
+        if r.column is not None and r.column != column:
+            continue
+        if value is None:
+            continue
+        op = _OPS.get(r.when)
+        if op is not None and op(value, r.value):
+            matched.append(i)
+    return matched
+
+
+def _style_items(style) -> list[str]:
     if not style:
-        return ""
-    css = []
+        return []
+    items: list[str] = []
     for key, val in style.items():
         prop = key.replace("_", "-")
         if key == "bold":
-            css.append("font-weight:bold" if val else "")
+            items.append("font-weight:bold" if val else "")
             continue
         if not _SAFE_PROP.match(prop):
             continue
         if val is True:
-            css.append(prop)
+            items.append(prop)
         else:
             if isinstance(val, str) and _UNSAFE_VALUE.search(val):
                 continue
-            css.append(f"{prop}:{_esc(val)}")
-    css = [c for c in css if c]
-    return f' style="{";".join(css)}"' if css else ""
+            items.append(f"{prop}:{_esc(val)}")
+    return [item for item in items if item]
+
+
+def _style_attr(style) -> str:
+    items = _style_items(style)
+    return f' style="{";".join(items)}"' if items else ""
+
+
+def _css_decls(style) -> str:
+    return ";".join(_style_items(style))
+
+
+def _style_block(result) -> str:
+    rules = []
+    for i, r in enumerate(result.styles):
+        decls = _css_decls(r.style)
+        if decls:
+            rules.append(f".rpt-cond-{i}{{{decls}}}")
+    if not rules:
+        return ""
+    return f"<style>{''.join(rules)}</style>"
