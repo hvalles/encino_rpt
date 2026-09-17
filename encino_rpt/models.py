@@ -205,6 +205,21 @@ class ReportResult(BaseModel):
 
         return TextRenderer().render(self)
 
+    def to_markdown(self) -> str:
+        """Renderiza el reporte a Markdown (tablas GFM, grupos como encabezados).
+
+        Fidelidad limitada: sin formato condicional ni gráficos — los `Chart`
+        degradan a una línea de texto resumen y los `Pivot` a una tabla GFM
+        filas×columnas. Los enlaces/imágenes se emiten como `[label](href)` /
+        `![alt](src)`.
+
+        Returns:
+            El Markdown como cadena.
+        """
+        from .renderers.markdown import MarkdownRenderer
+
+        return MarkdownRenderer().render(self)
+
     def to_excel(self, ws=None, styles: dict | None = None, formulas: bool = False):
         """Renderiza el reporte a una hoja de Excel (openpyxl).
 

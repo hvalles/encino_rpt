@@ -4,6 +4,7 @@ from .csv import CsvRenderer
 from .excel import ExcelRenderer
 from .html import HtmlRenderer
 from .json import JsonRenderer
+from .markdown import MarkdownRenderer
 from .pdf import PdfRenderer
 from .text import TextRenderer
 
@@ -12,6 +13,7 @@ __all__ = [
     "ExcelRenderer",
     "HtmlRenderer",
     "JsonRenderer",
+    "MarkdownRenderer",
     "PdfRenderer",
     "TextRenderer",
 ]
