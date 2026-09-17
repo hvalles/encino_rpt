@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Rendimiento** - Pivot en una sola pasada, grupos por ruta iterativos *(implementación directa)*
 - [x] **Phase 6: Features** - Renderizado Link/Image, campos de layout, renderer JSON versionado *(implementación directa)*
 - [x] **Phase 7: Refactor** - Traversal compartido, `GroupSpec` inmutable + validación *(implementación directa)*
-- [ ] **Phase 8: Tests & CI** - Tests de regresión consolidados + CI endurecido
+- [x] **Phase 8: Tests & CI** - Tests de regresión consolidados + CI endurecido (completed 2026-09-17)
 
 ## Phase Details
 
@@ -153,7 +153,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 08-04-PLAN.md — CI jobs `test`+`quality`, triage de mypy y verificación end-to-end de gates (TEST-02)
+- [x] 08-04-PLAN.md — CI jobs `test`+`quality`, triage de mypy y verificación end-to-end de gates (TEST-02)
 
 ## Progress
 
@@ -169,4 +169,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Rendimiento | - | Complete (directa) | 2026-09-16 |
 | 6. Features | - | Complete (directa) | 2026-09-16 |
 | 7. Refactor | - | Complete (directa) | 2026-09-16 |
-| 8. Tests & CI | 3/4 | In Progress|  |
+| 8. Tests & CI | 4/4 | Complete   | 2026-09-17 |
