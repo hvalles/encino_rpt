@@ -47,7 +47,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-03-PLAN.md — Eliminar `encino-orm` y limpiar docs (DEP-01)
+- [x] 01-03-PLAN.md — Eliminar `encino-orm` y limpiar docs (DEP-01)
 
 ### Phase 2: Correctness Crítico
 

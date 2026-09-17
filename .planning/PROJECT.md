@@ -23,17 +23,18 @@ Producir reportes financieros **correctos y seguros**: la agregación y el rende
 - ✓ Formato condicional (estilos por regla) — existente
 - ✓ 5 renderers: HTML, Excel (openpyxl), CSV, PDF (reportlab), texto — existente
 - ✓ Serialización JSON vía `model_dump()` — existente
+- ✓ `format_value` conserva precisión en números grandes (sin `1e+06`) — Validado en Fase 1 (CORR-02)
+- ✓ CSV sanitizer resiste espacios/BOM previos a caracteres peligrosos — Validado en Fase 1 (SEC-02)
+- ✓ `order_by` funciona con `expression=` (funciones custom) y con total ausente (error claro) — Validado en Fase 1 (CORR-04/CORR-05)
+- ✓ Dependencia muerta `encino-orm` eliminada — Validado en Fase 1 (DEP-01)
 
 ### Active
 
 <!-- Endurecer + completar + feature nueva. Hipótesis hasta que se validen. -->
 
 - [ ] `run()` es idempotente (re-ejecutar no duplica grupos)
-- [ ] `format_value` conserva precisión en números grandes (sin `1e+06`)
 - [ ] Excel `formulas=True` no doble-conta subtotales ni datos auxiliares de chart
 - [ ] Totales, headers y celdas de Excel pasan por sanitización anti-inyección
-- [ ] CSV sanitizer resiste espacios/BOM previos a caracteres peligrosos
-- [ ] `order_by` funciona con `expression=` (funciones custom) y con total ausente (error claro)
 - [ ] Errores de agregación reportan contexto (grupo/campo/fila), no excepciones crudas
 - [ ] `source=` desconocido y tokens `{{...}}` sin resolver fallan o avisan, no callan
 - [ ] Evaluador de expresiones robusto ante exponentes float y expresiones patológicas
@@ -44,7 +45,6 @@ Producir reportes financieros **correctos y seguros**: la agregación y el rende
 - [ ] `page_break`, `repeat_header` (HTML), `column_position` y `show_collapsed`/`default_collapsed` tienen efecto real
 - [ ] Traversal de renderers compartido (iterador único en lugar de 5 copias divergentes)
 - [ ] `GroupSpec` tratado como inmutable + validación up-front (nombres duplicados, `parent` antes de hijo, `custom:` registrado)
-- [ ] Dependencia muerta `encino-orm` eliminada
 - [ ] Renderer JSON con schema versionado (export estable + round-trip validado)
 - [ ] Cobertura de tests de regresión para todos los fixes
 - [ ] CI con type checker, `ruff format --check`, gate de cobertura y smoke de rendimiento
@@ -78,7 +78,7 @@ Producir reportes financieros **correctos y seguros**: la agregación y el rende
 |----------|-----------|---------|
 | Estructura por oleadas (corrección primero) | Priorizar correctness/seguridad sobre features nuevas | — Pending |
 | Implementar features (no eliminar campos muertos) | Alineado con el contrato de `docs/design/10-report.md` §8 | — Pending |
-| Quitar `encino-orm` | Dependencia de runtime sin uso (nada lo importa) | — Pending |
+| Quitar `encino-orm` | Dependencia de runtime sin uso (nada lo importa) | Done (Fase 1/DEP-01) |
 | Añadir renderer JSON con schema versionado | Export estable + round-trip validado, más allá de `model_dump()` crudo | — Pending |
 
 ## Evolution
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-16 after initialization*
+*Last updated: 2026-09-17 after Phase 1 (Quick Wins — Corrección low-risk)*
