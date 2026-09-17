@@ -1,6 +1,6 @@
 import pytest
 
-from encino_rpt import Chart, Detail, Pivot, Report, ReportResult
+from encino_rpt import Chart, Detail, Group, Pivot, Report, ReportResult
 from encino_rpt.expressions import ExpressionError, evaluate
 
 
@@ -228,6 +228,33 @@ def test_order_by_missing_total_raises():
         rep.run()
 
 
+def test_order_by_missing_column_raises():
+    rows = [
+        {"agente": "Ana", "total": 100},
+        {"agente": "Bob", "total": 300},
+    ]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "total", name="total_agt")
+    rep.group("global")
+    rep.section("global").order_by(column="columna_inexistente")
+
+    with pytest.raises(ValueError, match="columna de orden inexistente: 'columna_inexistente'"):
+        rep.run()
+
+
+def test_order_by_total_on_detail_names_child():
+    rows = [{"agente": "Ana", "total": 100}]
+    rep = Report(rows)
+    rep.detail("agente", "total")
+    rep.group("global")
+    rep.section("global").order_by(total="total_inexistente")
+
+    with pytest.raises(ValueError, match="total de orden inexistente") as exc:
+        rep.run()
+    assert "(hijo 'Detail')" in str(exc.value)
+
+
 def test_link_and_image():
     rows = [{"id": 1, "sku": "A1"}]
     rep = Report(rows)
@@ -299,4 +326,112 @@ def test_path_group():
     assert uno.children[0].row["monto"] == 10
     assert uno.children[1].key == {"cuenta": "1.1"}
     assert uno.children[1].totals[0].value == 50
+
+
+# --- idempotencia ---
+def test_run_is_idempotent():
+    rows = [{"agente": "Ana", "monto": 100}, {"agente": "Bob", "monto": 200}]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "monto")
+    rep.group("global")
+    rep.section("global").total("sum", "monto")
+    first = rep.run()
+    second = rep.run()
+    assert first.model_dump() == second.model_dump()
+    assert len(second.root.children) == 2
+
+
+def test_duplicate_group_name_raises():
+    rows = [{"a": 1}]
+    rep = Report(rows)
+    rep.group("g", columns="a")
+    with pytest.raises(ValueError, match="corte ya declarado"):
+        rep.group("g", columns="a")
+
+
+def test_parent_not_declared_raises():
+    rows = [{"a": 1}]
+    rep = Report(rows)
+    rep.group("hijo", columns="a", parent="noexiste")
+    with pytest.raises(ValueError, match="padre no declarado: 'noexiste'"):
+        rep.run()
+
+
+# --- errores con contexto ---
+def test_aggregation_error_context():
+    from encino_rpt.aggregation import AggregationError
+
+    rows = [{"monto": 0}]
+    rep = Report(rows)
+    rep.group("global")
+    rep.section("global").total("sum", expression="1 / monto")
+    with pytest.raises(AggregationError, match="grupo 'global'"):
+        rep.run()
+
+
+def test_custom_aggregate_missing():
+    from encino_rpt.aggregation import AggregationError
+
+    rows = [{"monto": 100}]
+    rep = Report(rows)
+    rep.group("global")
+    rep.section("global").total("custom:noexiste", "monto")
+    with pytest.raises(AggregationError, match="agregado custom no registrado"):
+        rep.run()
+
+
+def test_unknown_source_raises():
+    rows = [{"monto": 100}]
+    rep = Report(rows)
+    rep.group("global", source="noexiste")
+    with pytest.raises(ValueError, match="source no declarado: 'noexiste'"):
+        rep.run()
+
+
+# --- rendimiento ---
+def test_pivot_single_pass():
+    from encino_rpt._specs import PivotSpec
+    from encino_rpt.pivot import build_pivot
+
+    rows = [
+        {"fila": "A", "col": "x", "v": 1},
+        {"fila": "A", "col": "y", "v": 2},
+        {"fila": "B", "col": "x", "v": 3},
+    ]
+    processed = []
+
+    def value_fn(group):
+        processed.append(len(group))
+        return sum(r["v"] for r in group)
+
+    spec = PivotSpec(row_column="fila", column_column="col", value_column="v")
+    pivot = build_pivot(spec, rows, value_fn)
+
+    assert pivot.row_totals == [3, 3]
+    assert pivot.column_totals == [4, 2]
+    # una sola pasada: celdas + filas + columnas, sin re-escaneo O(filas x uniques)
+    assert len(processed) == 3 + 2 + 2
+    assert sum(processed) == len(rows) * 3
+
+
+def test_path_group_deep_no_recursion():
+    n = 1100
+    path = ".".join(str(i) for i in range(n))
+    rows = [{"cuenta": path, "monto": 7}]
+    rep = Report(rows)
+    rep.group("cuentas", path="cuenta")
+    rep.section("cuentas").total("sum", "monto")
+    rep.detail("cuenta", "monto")
+    rep.group("global")
+    result = rep.run()
+
+    node = result.root
+    depth = 0
+    while isinstance(node, Group) and node.children and isinstance(node.children[0], Group):
+        node = node.children[0]
+        depth += 1
+    assert isinstance(node.children[0], Detail)
+    assert node.children[0].row["monto"] == 7
+    assert depth == n
 

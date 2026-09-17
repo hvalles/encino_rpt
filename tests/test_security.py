@@ -91,3 +91,61 @@ def test_template_param_validation():
         render("{{param.5}}", {}, params=[1, 2])
     with pytest.raises(ValueError):
         render("{{param.}}", {}, params=[1, 2])
+
+
+def test_unknown_template_token_raises():
+    with pytest.raises(KeyError, match="token no resuelto"):
+        render("x={{totals.monto}}", {})
+
+
+# --- P2b: DoS en el evaluador (exponentes float y errores aritméticos) ---
+def test_expression_float_exponent_limit():
+    with pytest.raises(ExpressionError):
+        evaluate("2 ** 1e100", {})
+
+
+def test_expression_arithmetic_errors():
+    with pytest.raises(ExpressionError):
+        evaluate("1 / 0", {})
+    with pytest.raises(ExpressionError):
+        evaluate("2.0 ** 5000", {})
+
+
+# --- P3b: inyección CSS vía valores con ';' ---
+def test_html_style_value_injection_mitigated():
+    rows = [{"total": -5}]
+    rep = Report(rows)
+    rep.detail("total")
+    rep.add_style("total", when="lt", value=0, background="red;position:fixed")
+    result = rep.run()
+    html_out = result.render_html()
+    assert "position:fixed" not in html_out
+
+
+# --- P1b: sanitización de labels/headers en Excel ---
+def test_excel_total_label_sanitized():
+    pytest.importorskip("openpyxl")
+    rows = [{"sku": "A", "total": 100}]
+    rep = Report(rows)
+    rep.detail("sku", "total")
+    rep.group("global")
+    rep.section("global").total("sum", "total", label="=1+1")
+    result = rep.run()
+    ws = result.to_excel()
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value == "=1+1":
+                assert cell.data_type == "s"
+                return
+    pytest.fail("no se encontró la celda de total")
+
+
+def test_excel_header_sanitized():
+    pytest.importorskip("openpyxl")
+    rows = [{"=1+1": 1}]
+    rep = Report(rows)
+    rep.detail("=1+1")
+    result = rep.run()
+    ws = result.to_excel()
+    assert ws["A1"].value == "=1+1"
+    assert ws["A1"].data_type == "s"

@@ -17,20 +17,21 @@ def build_pivot(spec, rows, value_fn) -> Pivot:
     col_index = {v: i for i, v in enumerate(col_values)}
 
     buckets = {}
+    row_buckets = {}
+    col_buckets = {}
     for r in rows:
-        key = (r.get(spec.row_column), r.get(spec.column_column))
-        buckets.setdefault(key, []).append(r)
+        rv = r.get(spec.row_column)
+        cv = r.get(spec.column_column)
+        buckets.setdefault((rv, cv), []).append(r)
+        row_buckets.setdefault(rv, []).append(r)
+        col_buckets.setdefault(cv, []).append(r)
 
     cells = [[None] * len(col_values) for _ in row_values]
     for (rv, cv), group in buckets.items():
         cells[row_index[rv]][col_index[cv]] = value_fn(group)
 
-    row_totals = [
-        value_fn([r for r in rows if r.get(spec.row_column) == rv]) for rv in row_values
-    ]
-    col_totals = [
-        value_fn([r for r in rows if r.get(spec.column_column) == cv]) for cv in col_values
-    ]
+    row_totals = [value_fn(row_buckets[rv]) for rv in row_values]
+    col_totals = [value_fn(col_buckets[cv]) for cv in col_values]
 
     return Pivot(
         title=spec.title,

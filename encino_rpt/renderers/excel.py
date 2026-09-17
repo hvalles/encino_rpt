@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from ..models import Chart, Detail, Group, Pivot
+from ..models import Image, Link
 from ._format import excel_number_format
 from ._sanitize import write_excel_cell
+from ._walk import walk
 
 _COLOR_OPS = {
     "lt": lambda a, b: a < b,
@@ -63,65 +64,98 @@ class ExcelRenderer:
 
         # encabezado de columnas
         for j, col in enumerate(result.columns, start=1):
-            ws.cell(self._row, j, col).font = Font(bold=True)
+            write_excel_cell(ws.cell(self._row, j), col).font = Font(bold=True)
         self._row += 1
 
         self._walk(result.root)
         return ws
 
-    def _walk(self, node):
+    def _walk(self, root):
         ws = self._ws
+        group_stack = []
 
-        if isinstance(node, Group):
-            if node.header:
-                self._full_row(node.header, bold=True)
-            start = None
-            if self._formulas:
-                start = self._row
-            for child in node.children:
-                self._walk(child)
-            if node.footer:
-                self._full_row(node.footer, bold=True)
-            for t in node.totals:
-                label = t.label or t.name or t.operator
-                col_idx = self._column_index(t.column)
-                if (
-                    self._formulas
-                    and t.operator == "sum"
-                    and t.expression is None
-                    and col_idx is not None
-                    and start is not None
-                    and self._row > start
-                ):
-                    value = self._sum_formula(col_idx, start, self._row - 1)
-                else:
-                    value = t.value
-                fmt = t.format or (self._result.formats.get(t.column) if t.column else None)
-                self._total_row(label, value, col_idx, fmt)
-        elif isinstance(node, Detail):
-            for j, col in enumerate(self._result.columns, start=1):
-                value = node.row.get(col)
-                cell = write_excel_cell(ws.cell(self._row, j), value)
-                nf = excel_number_format(self._result.formats.get(col))
-                if nf:
-                    cell.number_format = nf
-                self._apply_conditional(cell, col, value)
-            self._row += 1
-        elif isinstance(node, Chart):
-            self._chart(node)
-        elif isinstance(node, Pivot):
-            self._pivot(node)
+        for event, node in walk(root):
+            if event == "group_start":
+                if node.header:
+                    self._full_row(node.header, bold=True)
+                group_stack.append([])
+            elif event == "detail":
+                row_idx = self._row
+                for j, col in enumerate(self._result.columns, start=1):
+                    value = node.row.get(col)
+                    cell = self._write_value(ws.cell(self._row, j), value)
+                    nf = excel_number_format(self._result.formats.get(col))
+                    if nf:
+                        cell.number_format = nf
+                    self._apply_conditional(cell, col, value)
+                self._row += 1
+                if group_stack:
+                    group_stack[-1].append(row_idx)
+            elif event == "chart":
+                self._chart(node)
+            elif event == "pivot":
+                self._pivot(node)
+            elif event == "group_end":
+                detail_rows = group_stack.pop()
+                if node.footer:
+                    self._full_row(node.footer, bold=True)
+                for t in node.totals:
+                    label = t.label or t.name or t.operator
+                    col_idx = self._column_index(t.column)
+                    pos_idx = self._column_index(t.column_position) if t.column_position else col_idx
+                    if (
+                        self._formulas
+                        and t.operator == "sum"
+                        and t.expression is None
+                        and col_idx is not None
+                        and detail_rows
+                    ):
+                        value = self._sum_formula(col_idx, detail_rows)
+                        formula = True
+                    else:
+                        value = t.value
+                        formula = False
+                    fmt = t.format or (self._result.formats.get(t.column) if t.column else None)
+                    self._total_row(label, value, pos_idx, fmt, formula=formula)
+                if group_stack:
+                    group_stack[-1].extend(detail_rows)
 
     def _column_index(self, column):
         if column is None or column not in self._result.columns:
             return None
         return self._result.columns.index(column) + 1
 
-    def _sum_formula(self, col_idx, start, end):
+    def _write_value(self, cell, value):
+        if isinstance(value, Link):
+            cell.value = value.label or value.href
+            cell.hyperlink = value.href
+            cell.style = "Hyperlink"
+            return cell
+        if isinstance(value, Image):
+            return write_excel_cell(cell, value.src)
+        return write_excel_cell(cell, value)
+
+    def _sum_formula(self, col_idx, rows):
         from openpyxl.utils import get_column_letter
 
         letter = get_column_letter(col_idx)
-        return f"=SUM({letter}{start}:{letter}{end})"
+        rows = sorted(set(rows))
+        if not rows:
+            return None
+        parts = []
+        start = prev = rows[0]
+        for r in rows[1:]:
+            if r == prev + 1:
+                prev = r
+                continue
+            parts.append((start, prev))
+            start = prev = r
+        parts.append((start, prev))
+        refs = [
+            f"{letter}{a}:{letter}{b}" if a != b else f"{letter}{a}"
+            for a, b in parts
+        ]
+        return "=SUM(" + ",".join(refs) + ")"
 
     def _full_row(self, text, bold=False):
         from openpyxl.styles import Font
@@ -131,15 +165,19 @@ class ExcelRenderer:
             cell.font = Font(bold=True)
         self._row += 1
 
-    def _total_row(self, label, value, col_idx, fmt):
+    def _total_row(self, label, value, col_idx, fmt, *, formula=False):
         ws = self._ws
         from openpyxl.styles import Font
 
         ncols = len(self._result.columns) or 1
-        if col_idx is None:
+        if col_idx is None or col_idx < 1:
             col_idx = ncols
-        ws.cell(self._row, 1, label).font = Font(bold=True)
-        cell = ws.cell(self._row, col_idx + 1 if col_idx < ncols else col_idx, value)
+        cell = write_excel_cell(ws.cell(self._row, 1), label)
+        cell.font = Font(bold=True)
+        if formula:
+            cell = ws.cell(self._row, col_idx, value)
+        else:
+            cell = write_excel_cell(ws.cell(self._row, col_idx), value)
         cell.font = Font(bold=True)
         nf = excel_number_format(fmt)
         if nf and not (isinstance(value, str) and value.startswith("=")):

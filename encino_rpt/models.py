@@ -199,6 +199,19 @@ class ReportResult(BaseModel):
 
         return ExcelRenderer(styles=styles, formulas=formulas).render(self, ws=ws)
 
+    def to_json(self, *, indent: int | None = 2) -> str:
+        """Serializa el reporte a JSON con schema versionado.
+
+        Args:
+            indent: Indentación de la salida (None = compacto).
+
+        Returns:
+            La cadena JSON con `schema_version`.
+        """
+        from .renderers.json import JsonRenderer
+
+        return JsonRenderer().render(self, indent=indent)
+
     def to_pdf(self, *, repeat_header: bool = True, **opts) -> bytes:
         """Renderiza el reporte a PDF (reportlab).
 

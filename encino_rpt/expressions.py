@@ -54,7 +54,10 @@ class ExpressionError(ValueError):
 def evaluate(expr: str, row: dict, functions: dict | None = None) -> Any:
     """Evalúa `expr` sobre `row` y las funciones extra (fusionadas con `_FUNCTIONS`)."""
     merged = {**_FUNCTIONS, **(functions or {})}
-    tree = ast.parse(expr, mode="eval")
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except (RecursionError, MemoryError, SyntaxError) as exc:
+        raise ExpressionError("expresión no válida o demasiado profunda") from exc
     if sum(1 for _ in ast.walk(tree)) > _MAX_NODES:
         raise ExpressionError("expresión demasiado compleja")
     return _walk(tree.body, row, merged)
@@ -77,14 +80,20 @@ def _walk(node, row: dict, functions: dict, depth: int = 0) -> Any:
             raise ExpressionError(f"operador no permitido: {ast.dump(node)}")
         left = _walk(node.left, row, functions, depth + 1)
         right = _walk(node.right, row, functions, depth + 1)
-        if isinstance(node.op, ast.Pow) and isinstance(right, int) and abs(right) > _MAX_POW_EXP:
+        if isinstance(node.op, ast.Pow) and isinstance(right, (int, float)) and abs(right) > _MAX_POW_EXP:
             raise ExpressionError("exponente demasiado grande")
-        return op(left, right)
+        try:
+            return op(left, right)
+        except (OverflowError, ZeroDivisionError) as exc:
+            raise ExpressionError(f"error aritmético: {exc}") from exc
     if isinstance(node, ast.UnaryOp):
         op = _UNARY.get(type(node.op))
         if op is None:
             raise ExpressionError(f"operador no permitido: {ast.dump(node)}")
-        return op(_walk(node.operand, row, functions, depth + 1))
+        try:
+            return op(_walk(node.operand, row, functions, depth + 1))
+        except (OverflowError, ZeroDivisionError) as exc:
+            raise ExpressionError(f"error aritmético: {exc}") from exc
     if isinstance(node, ast.Compare):
         left = _walk(node.left, row, functions, depth + 1)
         for op_node, comparator in zip(node.ops, node.comparators):

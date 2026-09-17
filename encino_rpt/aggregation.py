@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ._specs import GroupSpec
 from .charts import build_chart
-from .expressions import evaluate
+from .expressions import ExpressionError, evaluate
 from .models import (
     Detail,
     Format,
@@ -18,6 +18,22 @@ from .models import (
 )
 from .pivot import build_pivot
 from .template import render as render_template
+
+
+class AggregationError(ValueError):
+    """Error de agregación con contexto (grupo/campo/fila)."""
+
+
+def _wrap(context: str, fn, *args):
+    """Ejecuta `fn(*args)` y re-lanza cualquier error con contexto legible."""
+    try:
+        return fn(*args)
+    except AggregationError:
+        raise
+    except ExpressionError as exc:
+        raise AggregationError(f"{context}: {exc}") from exc
+    except Exception as exc:
+        raise AggregationError(f"{context}: {type(exc).__name__}: {exc}") from exc
 
 
 def _as_format(fmt):
@@ -48,7 +64,10 @@ def _aggregate(operator, values):
 def _value_for(operator, column, expression, rows, functions, aggregates):
     if operator.startswith("custom:"):
         name = operator.split(":", 1)[1]
-        return aggregates[name](rows, column)
+        fn = aggregates.get(name)
+        if fn is None:
+            raise AggregationError(f"agregado custom no registrado: {name!r}")
+        return fn(rows, column)
     if expression is not None:
         vals = [evaluate(expression, r, functions) for r in rows]
         if operator == "count":
@@ -91,7 +110,7 @@ def _enrich(report, source):
     rows = report._rows if source is None else report._datasets.get(source, [])
     out = []
     cum = {}
-    for row in rows:
+    for index, row in enumerate(rows):
         enriched = dict(row)
         for f in report._fields:
             if f.source not in (None, source):
@@ -99,7 +118,10 @@ def _enrich(report, source):
             if f.kind == "expr":
                 if f.expression is None:
                     continue
-                val = evaluate(f.expression, enriched, report._functions)
+                val = _wrap(
+                    f"campo {f.name!r} (fila {index})",
+                    evaluate, f.expression, enriched, report._functions,
+                )
                 if f.cumulative == "sum":
                     prev = cum.get(f.name, 0 if f.start is None else f.start)
                     val = prev + (val or 0)
@@ -125,16 +147,15 @@ def _build_group_tree(report):
     if root is None:
         root = GroupSpec(name="global", columns=None)
 
+    children_map = {}
     for name in report._order:
         s = specs[name]
         if s is root:
             continue
         parent = specs.get(s.parent) if s.parent else None
-        if parent is not None:
-            parent.children.append(s)
-        else:
-            root.children.append(s)
-    return root
+        key = parent.name if parent is not None else root.name
+        children_map.setdefault(key, []).append(s)
+    return root, children_map
 
 
 def _partition(spec, rows):
@@ -153,13 +174,13 @@ def _partition(spec, rows):
     ]
 
 
-def _build_group(report, spec, sources, registry, deferred, visible):
+def _build_group(report, spec, sources, registry, deferred, visible, children_map):
     rows = sources.get(spec.source, sources[None])
     if spec.path is not None:
         return _build_path_group(report, spec, rows, registry, deferred, visible)
     result = []
     for key, part_rows in _partition(spec, rows):
-        result.append(_build_instance(report, spec, key, part_rows, sources, registry, deferred, visible))
+        result.append(_build_instance(report, spec, key, part_rows, sources, registry, deferred, visible, children_map))
     return result
 
 
@@ -167,11 +188,14 @@ def _compute_totals_into(report, spec, rows, node, registry, deferred):
     for ts in spec.totals:
         if ts.expression and "TOTAL(" in ts.expression:
             total = _make_total(ts, None)
-            deferred.append((total, ts, rows))
+            deferred.append((total, ts, rows, spec.name))
             node.totals.append(total)
         else:
-            val = _value_for(ts.operator, ts.column, ts.expression, rows,
-                             report._functions, report._aggregates)
+            val = _wrap(
+                f"total {ts.name or ts.operator!r} (grupo {spec.name!r})",
+                _value_for, ts.operator, ts.column, ts.expression, rows,
+                report._functions, report._aggregates,
+            )
             total = _make_total(ts, val)
             node.totals.append(total)
             if ts.name:
@@ -180,58 +204,77 @@ def _compute_totals_into(report, spec, rows, node, registry, deferred):
 
 
 def _build_path_group(report, spec, rows, registry, deferred, visible):
-    return _make_path_node(report, spec, rows, 0, registry, deferred, visible)
+    return _make_path_node(report, spec, rows, registry, deferred, visible)
 
 
 def _segs(r, spec):
     return [s for s in str(r.get(spec.path, "")).split(spec.separator) if s != ""]
 
 
-def _make_path_node(report, spec, rows, level, registry, deferred, visible):
-    buckets = {}
-    order = []
-    for r in rows:
-        segs = _segs(r, spec)
-        seg = segs[level] if level < len(segs) else ""
-        if seg not in buckets:
-            buckets[seg] = []
-            order.append(seg)
-        buckets[seg].append(r)
+class _PathNode:
+    """Nodo de un trie de rutas (jerarquía por `path` construida sin recursión)."""
 
-    results = []
-    for seg in order:
-        sub_rows = buckets[seg]
-        segs0 = _segs(sub_rows[0], spec)
-        cur_path = spec.separator.join(segs0[: level + 1])
-        node = Group(
-            name=spec.name, key={spec.path: cur_path},
-            show_collapsed=spec.show_collapsed,
-            default_collapsed=spec.default_collapsed,
-            page_break=spec.page_break,
-        )
-        node._first_row = dict(sub_rows[0])
-        node._header_tpl = spec.header
-        node._footer_tpl = spec.footer
-        _compute_totals_into(report, spec, sub_rows, node, registry, deferred)
+    __slots__ = ("children", "leaf_rows", "order", "path", "rows")
 
-        leaf_rows = [r for r in sub_rows if len(_segs(r, spec)) == level + 1]
-        branch_rows = [r for r in sub_rows if len(_segs(r, spec)) > level + 1]
-
-        children = []
-        if leaf_rows:
-            children += [
-                Detail(row={k: v for k, v in r.items() if k in visible}) for r in leaf_rows
-            ]
-        if branch_rows:
-            children += [
-                n for n, _ in _make_path_node(report, spec, branch_rows, level + 1, registry, deferred, visible)
-            ]
-        node.children = children
-        results.append((node, sub_rows))
-    return results
+    def __init__(self, path):
+        self.path = path
+        self.rows = []
+        self.leaf_rows = []
+        self.children = {}
+        self.order = []
 
 
-def _build_instance(report, spec, key, rows, sources, registry, deferred, visible):
+def _make_path_node(report, spec, rows, registry, deferred, visible):
+    # dividir cada fila una sola vez (PERF-02)
+    prepared = [(r, _segs(r, spec)) for r in rows]
+
+    trie = _PathNode("")
+    for r, segs in prepared:
+        node = trie
+        parts = []
+        for seg in segs:
+            parts.append(seg)
+            child = node.children.get(seg)
+            if child is None:
+                child = _PathNode(spec.separator.join(parts))
+                node.children[seg] = child
+                node.order.append(seg)
+            node = child
+            node.rows.append(r)
+        node.leaf_rows.append(r)
+
+    # construir los Group iterativamente (sin límite de recursión por profundidad)
+    groups = {}
+    stack = [trie]
+    while stack:
+        tnode = stack.pop()
+        if tnode is not trie:
+            g = Group(
+                name=spec.name, key={spec.path: tnode.path},
+                show_collapsed=spec.show_collapsed,
+                default_collapsed=spec.default_collapsed,
+                page_break=spec.page_break,
+            )
+            g._first_row = dict(tnode.rows[0])
+            g._header_tpl = spec.header
+            g._footer_tpl = spec.footer
+            _compute_totals_into(report, spec, tnode.rows, g, registry, deferred)
+            groups[tnode] = g
+        for seg in tnode.order:
+            stack.append(tnode.children[seg])
+
+    for tnode, g in groups.items():
+        children = [
+            Detail(row={k: v for k, v in r.items() if k in visible})
+            for r in tnode.leaf_rows
+        ]
+        children += [groups[tnode.children[seg]] for seg in tnode.order]
+        g.children = children
+
+    return [(groups[trie.children[seg]], trie.children[seg].rows) for seg in trie.order]
+
+
+def _build_instance(report, spec, key, rows, sources, registry, deferred, visible, children_map):
     node = Group(
         name=spec.name, key=key,
         show_collapsed=spec.show_collapsed,
@@ -244,9 +287,10 @@ def _build_instance(report, spec, key, rows, sources, registry, deferred, visibl
 
     # children: subgrupos o detalle
     child_pairs = []
-    if spec.children:
-        for child_spec in spec.children:
-            child_pairs.extend(_build_group(report, child_spec, sources, registry, deferred, visible))
+    child_specs = children_map.get(spec.name, [])
+    if child_specs:
+        for child_spec in child_specs:
+            child_pairs.extend(_build_group(report, child_spec, sources, registry, deferred, visible, children_map))
         node.children = [n for n, _ in child_pairs]
     else:
         node.children = [
@@ -287,6 +331,10 @@ def _apply_order(spec, children, functions):
     return children
 
 
+def _child_desc(child) -> str:
+    return getattr(child, "name", None) or getattr(child, "key", None) or type(child).__name__
+
+
 def _sort_key(child, ob, functions):
     total = ob.get("total")
     expression = ob.get("expression")
@@ -295,16 +343,19 @@ def _sort_key(child, ob, functions):
         for t in getattr(child, "totals", []):
             if t.name == total:
                 return t.value
-        child_desc = getattr(child, "name", None) or getattr(child, "key", None)
-        raise ValueError(f"total de orden inexistente: {total!r} (hijo {child_desc!r})")
+        raise ValueError(f"total de orden inexistente: {total!r} (hijo {_child_desc(child)!r})")
     if expression:
         return evaluate(expression, getattr(child, "_first_row", {}), functions)
     if column:
         if isinstance(child, Group):
-            return child.key.get(column) if child.key else None
+            if child.key is None or column not in child.key:
+                raise ValueError(f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})")
+            return child.key[column]
         if isinstance(child, Detail):
-            return child.row.get(column)
-        return None
+            if column not in child.row:
+                raise ValueError(f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})")
+            return child.row[column]
+        raise ValueError(f"columna de orden inexistente: {column!r} (hijo {_child_desc(child)!r})")
     return 0
 
 
@@ -331,28 +382,33 @@ def _is_zero(child, sz):
 def _resolve_deferred(deferred, functions, aggregates, registry):
     fns = dict(functions)
     fns["TOTAL"] = lambda name: registry.get(name)
-    for total, spec, rows in deferred:
-        total.value = _value_for(spec.operator, spec.column, spec.expression, rows, fns, aggregates)
+    for total, spec, rows, group_name in deferred:
+        total.value = _wrap(
+            f"total {spec.name or spec.operator!r} (grupo {group_name!r})",
+            _value_for, spec.operator, spec.column, spec.expression, rows, fns, aggregates,
+        )
 
 
 # --- plantillas (fase final) ---
-def _render_templates(node, registry, params):
-    if not isinstance(node, Group):
-        return
-    ctx = dict(node._first_row)
-    if node.key:
-        ctx.update(node.key)
-    for t in node.totals:
-        if t.name:
-            ctx[f"total.{t.name}"] = t.value
-    for key, val in registry.items():
-        ctx[f"total.{key}"] = val
-    if node._header_tpl:
-        node.header = render_template(node._header_tpl, ctx, params)
-    if node._footer_tpl:
-        node.footer = render_template(node._footer_tpl, ctx, params)
-    for child in node.children:
-        _render_templates(child, registry, params)
+def _render_templates(root, registry, params):
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, Group):
+            continue
+        ctx = dict(node._first_row)
+        if node.key:
+            ctx.update(node.key)
+        for t in node.totals:
+            if t.name:
+                ctx[f"total.{t.name}"] = t.value
+        for key, val in registry.items():
+            ctx[f"total.{key}"] = val
+        if node._header_tpl:
+            node.header = render_template(node._header_tpl, ctx, params)
+        if node._footer_tpl:
+            node.footer = render_template(node._footer_tpl, ctx, params)
+        stack.extend(node.children)
 
 
 def _build_kpis(report, sources):
@@ -362,8 +418,11 @@ def _build_kpis(report, sources):
             value = spec.value
         else:
             rows = sources.get(spec.source, sources[None])
-            value = _value_for(spec.operator, spec.column, spec.expression, rows,
-                               report._functions, report._aggregates)
+            value = _wrap(
+                f"kpi {spec.label!r}",
+                _value_for, spec.operator, spec.column, spec.expression, rows,
+                report._functions, report._aggregates,
+            )
         kpis.append(Kpi(label=spec.label, value=value, format=_as_format(spec.format)))
     return kpis
 
@@ -379,7 +438,28 @@ def _visible_columns(report):
     return cols
 
 
+def _validate(report):
+    known = set(report._datasets)
+    for spec in report._groups.values():
+        if spec.source is not None and spec.source not in known:
+            raise ValueError(f"source no declarado: {spec.source!r}")
+        if spec.parent is not None and spec.parent not in report._groups:
+            raise ValueError(f"padre no declarado: {spec.parent!r}")
+        for ts in spec.totals:
+            if ts.operator.startswith("custom:"):
+                name = ts.operator.split(":", 1)[1]
+                if name not in report._aggregates:
+                    raise AggregationError(f"agregado custom no registrado: {name!r}")
+    for f in report._fields:
+        if f.source is not None and f.source not in known:
+            raise ValueError(f"source no declarado: {f.source!r}")
+    for k in report._kpis:
+        if k.source is not None and k.source not in known:
+            raise ValueError(f"source no declarado: {k.source!r}")
+
+
 def build(report) -> ReportResult:
+    _validate(report)
     visible = _visible_columns(report)
     visible_set = set(visible)
 
@@ -387,10 +467,10 @@ def build(report) -> ReportResult:
     for name in report._datasets:
         sources[name] = _enrich(report, name)
 
-    root_spec = _build_group_tree(report)
+    root_spec, children_map = _build_group_tree(report)
     registry = {}
     deferred = []
-    root_nodes = _build_group(report, root_spec, sources, registry, deferred, visible_set)
+    root_nodes = _build_group(report, root_spec, sources, registry, deferred, visible_set, children_map)
 
     root = root_nodes[0][0] if root_nodes else Group(name="global", key=None)
 

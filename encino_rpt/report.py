@@ -246,6 +246,8 @@ class Report:
         """
         if columns is not None and path is not None:
             raise ValueError("`columns` y `path` son excluyentes")
+        if name in self._groups:
+            raise ValueError(f"corte ya declarado: {name!r}")
         cols = None
         if columns is not None:
             cols = [columns] if isinstance(columns, str) else list(columns)

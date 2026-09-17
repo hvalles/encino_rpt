@@ -125,6 +125,34 @@ def test_excel_formulas():
     assert any("SUM" in f for f in formula_cells)
 
 
+def test_excel_formulas_no_double_count():
+    pytest.importorskip("openpyxl")
+    rows = [
+        {"agente": "Ana", "monto": 100},
+        {"agente": "Ana", "monto": 50},
+        {"agente": "Bob", "monto": 200},
+    ]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").total("sum", "monto")
+    rep.group("global")
+    rep.section("global").total("sum", "monto")
+    rep.detail("agente", "monto")
+    result = rep.run()
+
+    ws = result.to_excel(formulas=True)
+    formulas = {
+        c.value for row in ws.iter_rows() for c in row
+        if isinstance(c.value, str) and c.value.startswith("=")
+    }
+    # subtotales y total global referencian SOLO filas de detalle (sin doble conteo)
+    assert "=SUM(B2:B3)" in formulas
+    assert "=SUM(B5)" in formulas
+    assert "=SUM(B2:B3,B5)" in formulas
+    # el total global NO abarca las filas de subtotal (B4, B6)
+    assert "=SUM(B2:B6)" not in formulas
+
+
 def test_excel_number_format():
     pytest.importorskip("openpyxl")
     rows = [{"total": 1234.5}]
@@ -145,4 +173,143 @@ def test_pdf_renderer():
     result = rep.run()
     pdf = result.to_pdf()
     assert pdf[:5] == b"%PDF-"
+
+
+# --- Link/Image ---
+def test_link_image_html():
+    rows = [{"id": 1, "sku": "A1"}]
+    rep = Report(rows)
+    rep.link("ver", "report", href="/pedido/{{id}}", label="Ver", after="id")
+    rep.image("foto", src="/media/{{sku}}.png", alt="Foto", after="sku")
+    rep.detail("id", "sku")
+    result = rep.run()
+    html_out = result.render_html()
+    assert '<a href="/pedido/1">Ver</a>' in html_out
+    assert '<img src="/media/A1.png" alt="Foto"/>' in html_out
+    assert "type='link'" not in html_out
+
+
+def test_link_excel():
+    pytest.importorskip("openpyxl")
+    rows = [{"id": 1}]
+    rep = Report(rows)
+    rep.link("ver", "external", href="/pedido/{{id}}", label="Ver", after="id")
+    rep.detail("id")
+    result = rep.run()
+    ws = result.to_excel()
+    assert ws["B1"].value == "ver"
+    cell = ws["B2"]
+    assert cell.value == "Ver"
+    assert cell.hyperlink.target == "/pedido/1"
+
+
+def test_link_image_csv():
+    rows = [{"id": 1, "sku": "A1"}]
+    rep = Report(rows)
+    rep.link("ver", "report", href="/pedido/{{id}}", label="Ver", after="id")
+    rep.image("foto", src="/media/{{sku}}.png", after="sku")
+    rep.detail("id", "sku")
+    result = rep.run()
+    csv_out = result.to_csv()
+    assert "Ver" in csv_out
+    assert "/media/A1.png" in csv_out
+
+
+def test_link_image_text():
+    rows = [{"id": 1, "sku": "A1"}]
+    rep = Report(rows)
+    rep.link("ver", "report", href="/pedido/{{id}}", label="Ver", after="id")
+    rep.image("foto", src="/media/{{sku}}.png", after="sku")
+    rep.detail("id", "sku")
+    result = rep.run()
+    text = result.to_text()
+    assert "Ver -> /pedido/1" in text
+    assert "/media/A1.png" in text
+
+
+# --- layout (FEAT-02) ---
+def test_excel_total_column_position():
+    pytest.importorskip("openpyxl")
+    rows = [{"sku": "A", "monto": 100, "nota": "x"}]
+    rep = Report(rows)
+    rep.detail("sku", "monto", "nota")
+    rep.group("global")
+    rep.section("global").total("sum", "monto", column_position="nota")
+    result = rep.run()
+    ws = result.to_excel()
+    assert ws["A3"].value == "sum"
+    assert ws["B3"].value is None
+    assert ws["C3"].value == 100
+
+
+def test_html_page_break_class():
+    rows = [{"agente": "Ana", "monto": 100}]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").header("Agente {{agente}}").page_break()
+    rep.group("global")
+    result = rep.run()
+    html_out = result.render_html()
+    assert "page-break" in html_out
+
+
+def test_html_repeat_header():
+    rows = [{"agente": "Ana", "monto": 100}, {"agente": "Bob", "monto": 200}]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente")
+    rep.section("por_agente").header("Agente {{agente}}")
+    rep.detail("agente", "monto")
+    rep.group("global")
+    result = rep.run()
+    html_out = result.render_html(repeat_header=True)
+    assert html_out.count('<tr class="header">') == 2
+
+
+def test_html_default_collapsed():
+    rows = [{"agente": "Ana", "monto": 100}]
+    rep = Report(rows)
+    rep.group("por_agente", columns="agente", default_collapsed=True)
+    rep.section("por_agente").header("Agente {{agente}}")
+    rep.group("global")
+    result = rep.run()
+    html_out = result.render_html()
+    assert "<details>" in html_out
+    assert "<summary>Agente Ana</summary>" in html_out
+
+
+# --- JSON versionado (JSON-01) ---
+def test_json_renderer_roundtrip():
+    import json
+
+    from encino_rpt import ReportResult
+
+    rows = [{"sku": "A", "cantidad": 2}]
+    rep = Report(rows)
+    rep.detail("sku", "cantidad")
+    rep.group("global")
+    rep.section("global").total("sum", "cantidad")
+    result = rep.run()
+
+    data = json.loads(result.to_json())
+    assert data["schema_version"] == "1.0"
+    assert data["root"]["type"] == "group"
+
+    restored = ReportResult.model_validate(data)
+    assert restored.root.totals[0].value == 2
+
+
+def test_deep_path_renders_iteratively():
+    n = 1100
+    path = ".".join(str(i) for i in range(n))
+    rows = [{"cuenta": path, "monto": 7}]
+    rep = Report(rows)
+    rep.group("cuentas", path="cuenta")
+    rep.detail("cuenta", "monto")
+    rep.group("global")
+    result = rep.run()
+
+    text = result.to_text()
+    assert "monto=7" in text
+    html_out = result.render_html()
+    assert "<table>" in html_out
 

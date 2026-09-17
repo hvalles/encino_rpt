@@ -5,8 +5,9 @@ from __future__ import annotations
 import html as _html
 import re as _re
 
-from ..models import Chart, Detail, Group, Pivot
+from ..models import Image, Link
 from ._format import format_value
+from ._walk import walk
 
 _OPS = {
     "lt": lambda a, b: a < b,
@@ -18,6 +19,7 @@ _OPS = {
 }
 
 _SAFE_PROP = _re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
+_UNSAFE_VALUE = _re.compile(r"[;{}\x00-\x1f\x7f]")
 
 
 class HtmlRenderer:
@@ -48,32 +50,41 @@ class HtmlRenderer:
     def _ncols(self, result) -> int:
         return len(result.columns) or 1
 
-    def _walk(self, node, result, parts):
-        if isinstance(node, Group):
-            if node.header:
-                parts.append(self._full_row("group", node.header, self._ncols(result)))
-            for child in node.children:
-                self._walk(child, result, parts)
-            for t in node.totals:
-                label = t.label or t.name or t.operator
-                fmt = t.format or (result.formats.get(t.column) if t.column else None)
-                parts.append(self._full_row("total", f"{label}: {format_value(t.value, fmt)}", self._ncols(result)))
-            if node.footer:
-                parts.append(self._full_row("group", node.footer, self._ncols(result)))
-        elif isinstance(node, Detail):
-            cells = []
-            for c in result.columns:
-                value = node.row.get(c)
-                attrs = self._cell_attrs(c, value, result.styles)
-                cells.append(f"<td{attrs}>{_esc(format_value(value, result.formats.get(c)))}</td>")
-            parts.append(f"<tr>{''.join(cells)}</tr>")
-        elif isinstance(node, Chart):
-            summary = "; ".join(
-                f"{s.label or ''}: {', '.join(map(str, s.values))}" for s in node.series
-            )
-            parts.append(self._full_row("chart", f"{node.kind} {node.title or ''} — {summary}", self._ncols(result)))
-        elif isinstance(node, Pivot):
-            parts.append(f'<tr class="pivot"><td colspan="{self._ncols(result)}">{self._pivot(node)}</td></tr>')
+    def _walk(self, root, result, parts):
+        for event, node in walk(root):
+            if event == "group_start":
+                if node.default_collapsed:
+                    parts.append("<details>")
+                    parts.append(f"<summary>{_esc(node.header or '')}</summary>")
+                else:
+                    if self.repeat_header and node.header and result.columns:
+                        parts.append(self._header_row(result))
+                    if node.header:
+                        cls = "group page-break" if node.page_break else "group"
+                        parts.append(self._full_row(cls, node.header, self._ncols(result)))
+            elif event == "group_end":
+                if node.default_collapsed:
+                    parts.append("</details>")
+                for t in node.totals:
+                    label = t.label or t.name or t.operator
+                    fmt = t.format or (result.formats.get(t.column) if t.column else None)
+                    parts.append(self._full_row("total", f"{label}: {format_value(t.value, fmt)}", self._ncols(result)))
+                if node.footer:
+                    parts.append(self._full_row("group", node.footer, self._ncols(result)))
+            elif event == "detail":
+                cells = []
+                for c in result.columns:
+                    value = node.row.get(c)
+                    attrs = self._cell_attrs(c, value, result.styles)
+                    cells.append(f"<td{attrs}>{self._cell_content(c, value, result)}</td>")
+                parts.append(f"<tr>{''.join(cells)}</tr>")
+            elif event == "chart":
+                summary = "; ".join(
+                    f"{s.label or ''}: {', '.join(map(str, s.values))}" for s in node.series
+                )
+                parts.append(self._full_row("chart", f"{node.kind} {node.title or ''} — {summary}", self._ncols(result)))
+            elif event == "pivot":
+                parts.append(f'<tr class="pivot"><td colspan="{self._ncols(result)}">{self._pivot(node)}</td></tr>')
 
     def _pivot(self, node) -> str:
         head = "<th></th>" + "".join(f"<th>{_esc(str(c))}</th>" for c in node.columns)
@@ -87,6 +98,26 @@ class HtmlRenderer:
     def _full_row(self, css_class, text, ncols) -> str:
         cls = self.classes.get(css_class, css_class)
         return f'<tr class="{_esc(cls)}"><td colspan="{ncols}">{_esc(text)}</td></tr>'
+
+    def _header_row(self, result) -> str:
+        header = "".join(f"<th>{_esc(c)}</th>" for c in result.columns)
+        return f'<tr class="header">{header}</tr>'
+
+    def _cell_content(self, column, value, result) -> str:
+        if isinstance(value, Link):
+            href = _esc(value.href)
+            label = _esc(value.label or value.href)
+            return f'<a href="{href}">{label}</a>'
+        if isinstance(value, Image):
+            attrs = f' src="{_esc(value.src)}"'
+            if value.alt is not None:
+                attrs += f' alt="{_esc(value.alt)}"'
+            if value.width is not None:
+                attrs += f' width="{int(value.width)}"'
+            if value.height is not None:
+                attrs += f' height="{int(value.height)}"'
+            return f"<img{attrs}/>"
+        return _esc(format_value(value, result.formats.get(column)))
 
     def _cell_attrs(self, column, value, rules) -> str:
         style = {}
@@ -119,6 +150,8 @@ def _style_attr(style) -> str:
         if val is True:
             css.append(prop)
         else:
+            if isinstance(val, str) and _UNSAFE_VALUE.search(val):
+                continue
             css.append(f"{prop}:{_esc(val)}")
     css = [c for c in css if c]
     return f' style="{";".join(css)}"' if css else ""

@@ -25,6 +25,8 @@ def render(template: str, ctx: dict, params: list | None = None) -> str:
             if index < 0 or index >= len(params):
                 raise IndexError(f"parámetro {index} fuera de rango (hay {len(params)})")
             return str(params[index])
-        return str(ctx.get(token, ""))
+        if token not in ctx:
+            raise KeyError(f"token no resuelto: {token!r}")
+        return str(ctx[token])
 
     return _TOKEN.sub(repl, template)
