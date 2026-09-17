@@ -66,6 +66,8 @@ class TextRenderer:
                 depth -= 1
                 indent = "  " * depth
                 for t in node.totals:
+                    if t.hidden:
+                        continue
                     label = t.label or t.name or t.operator
                     fmt = t.format or (
                         result.formats.get(t.column) if t.column else None

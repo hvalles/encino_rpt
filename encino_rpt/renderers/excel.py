@@ -121,6 +121,8 @@ class ExcelRenderer:
                 if node.footer:
                     self._full_row(node.footer, bold=True, depth=len(group_stack))
                 for t in node.totals:
+                    if t.hidden:
+                        continue
                     label = t.label or t.name or t.operator
                     col_idx = self._column_index(t.column)
                     pos_idx = (

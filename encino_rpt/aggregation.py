@@ -109,6 +109,7 @@ def _make_total(spec, value):
         value=value,
         format=_as_format(spec.format),
         column_position=spec.column_position,
+        hidden=spec.hidden,
     )
 
 
@@ -212,8 +213,12 @@ def _partition(spec, rows):
     return [({c: v for c, v in zip(spec.columns, key)}, index[key]) for key in order]
 
 
-def _build_group(report, spec, sources, registry, deferred, visible, children_map):
-    rows = sources.get(spec.source, sources[None])
+def _build_group(
+    report, spec, parent_rows, sources, registry, deferred, visible, children_map
+):
+    # Anidamiento: un corte parte las filas de su padre; solo usa su propio
+    # `source` (multi-dataset) si lo declara.
+    rows = parent_rows if spec.source is None else sources.get(spec.source, [])
     if spec.path is not None:
         return _build_path_group(report, spec, rows, registry, deferred, visible)
     result = []
@@ -354,6 +359,7 @@ def _build_instance(
                 _build_group(
                     report,
                     child_spec,
+                    rows,
                     sources,
                     registry,
                     deferred,
@@ -509,6 +515,8 @@ def _resolve_deferred(deferred, functions, aggregates, registry):
 
 # --- plantillas (fase final) ---
 def _render_templates(root, registry, params):
+    from .renderers._format import format_value
+
     stack = [root]
     while stack:
         node = stack.pop()
@@ -519,7 +527,7 @@ def _render_templates(root, registry, params):
             ctx.update(node.key)
         for t in node.totals:
             if t.name:
-                ctx[f"total.{t.name}"] = t.value
+                ctx[f"total.{t.name}"] = format_value(t.value, t.format)
         for key, val in registry.items():
             ctx[f"total.{key}"] = val
         if node._header_tpl:
@@ -603,7 +611,14 @@ def build(report) -> ReportResult:
     registry: dict[str, Any] = {}
     deferred: list[tuple[Total, Any, Any, str]] = []
     root_nodes = _build_group(
-        report, root_spec, sources, registry, deferred, visible_set, children_map
+        report,
+        root_spec,
+        sources[None],
+        sources,
+        registry,
+        deferred,
+        visible_set,
+        children_map,
     )
 
     root = root_nodes[0][0] if root_nodes else Group(name="global", key=None)

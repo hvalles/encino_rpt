@@ -45,6 +45,7 @@ class Section:
         label: str | None = None,
         column_position: str | None = None,
         format=None,
+        hidden: bool = False,
     ) -> Section:
         """Añade un total al corte.
 
@@ -58,13 +59,23 @@ class Section:
             label: Etiqueta del total.
             column_position: Pista de presentación (columna bajo la que alinear).
             format: Formato de presentación.
+            hidden: Si es `True`, el total se calcula y es referenciable vía
+                `{{total.NOMBRE}}` (p. ej. en header/footer) pero **no** se
+                renderiza como fila.
 
         Returns:
             La propia sección (fluido).
         """
         self._spec.totals.append(
             TotalSpec(
-                operator, column, expression, name, label, format, column_position
+                operator,
+                column,
+                expression,
+                name,
+                label,
+                format,
+                column_position,
+                hidden,
             )
         )
         return self

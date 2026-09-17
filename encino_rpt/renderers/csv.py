@@ -80,6 +80,8 @@ class CsvRenderer:
                     yield [sanitize_csv(node.header)]
             elif event == "group_end":
                 for t in node.totals:
+                    if t.hidden:
+                        continue
                     label = t.label or t.name or t.operator
                     fmt = t.format or (
                         result.formats.get(t.column) if t.column else None

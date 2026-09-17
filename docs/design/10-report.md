@@ -347,7 +347,8 @@ class Section:
     def total(self, operator: str, column: str | None = None, *,
               expression: str | None = None, name: str | None = None,
               label: str | None = None, column_position: str | None = None,
-              format: Format | dict | None = None) -> "Section": ...
+              format: Format | dict | None = None,
+              hidden: bool = False) -> "Section": ...
     def chart(self, kind: str, *, title: str | None = None,
               operator: str = "sum", column: str | None = None,
               expression: str | None = None, label_field: str | None = None,

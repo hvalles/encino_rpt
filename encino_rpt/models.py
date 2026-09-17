@@ -66,6 +66,7 @@ class Total:
     value: Any = None
     format: Format | None = None
     column_position: str | None = None
+    hidden: bool = False  # referenciable vía {{total.NOMBRE}} pero no renderizado
 
 
 @dataclass

@@ -36,6 +36,7 @@ class TotalSpec:
     label: str | None = None
     format: Any = None
     column_position: str | None = None
+    hidden: bool = False  # calculado y referenciable, pero no renderizado como fila
 
 
 @dataclass

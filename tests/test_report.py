@@ -582,3 +582,67 @@ def test_aggregate_operators():
     assert totals["max"] == 3
     assert totals["min"] == 1
     assert totals["custom:n"] == 3  # len(rows)
+
+
+def test_nested_groups_partition_parent_rows():
+    rows = [
+        {"a": "A1", "b": "B1", "v": 1},
+        {"a": "A1", "b": "B2", "v": 2},
+        {"a": "A2", "b": "B1", "v": 3},
+    ]
+    rep = Report(rows)
+    rep.detail("a", "b", "v")
+    rep.group("por_a", columns="a")
+    rep.section("por_a").total("sum", "v")
+    rep.group("por_b", columns="b", parent="por_a")
+    rep.section("por_b").total("sum", "v")
+    rep.group("global")
+    result = rep.run()
+
+    a1, a2 = result.root.children
+    assert a1.key == {"a": "A1"}
+    assert a1.totals[0].value == 3  # 1 + 2
+    assert [c.key for c in a1.children] == [{"b": "B1"}, {"b": "B2"}]
+    assert a1.children[0].totals[0].value == 1  # solo filas de A1
+    assert a1.children[1].totals[0].value == 2
+    assert a2.key == {"a": "A2"}
+    assert a2.totals[0].value == 3
+    assert [c.key for c in a2.children] == [{"b": "B1"}]
+    assert a2.children[0].totals[0].value == 3  # solo filas de A2
+
+
+def test_hidden_total_referenced_in_footer():
+    rows = [{"a": "A1", "v": 10}, {"a": "A1", "v": 5}]
+    rep = Report(rows)
+    rep.detail("a", "v")
+    rep.group("por_a", columns="a")
+    rep.section("por_a").total("sum", "v", name="sub", hidden=True)
+    rep.section("por_a").footer("Cierre {{a}}: {{total.sub}}")
+    rep.group("global")
+    result = rep.run()
+
+    node = result.root.children[0]
+    assert node.totals[0].value == 15
+    assert node.totals[0].hidden is True
+    assert node.footer == "Cierre A1: 15"
+    html = result.render_html()
+    assert "Cierre A1: 15" in html
+    assert '<tr class="total">' not in html  # no se despliega como fila
+
+
+def test_hidden_total_formatted_in_footer():
+    rows = [{"a": "A1", "v": 1234.5}]
+    rep = Report(rows)
+    rep.detail("a", "v")
+    rep.group("por_a", columns="a")
+    rep.section("por_a").total(
+        "sum",
+        "v",
+        name="sub",
+        hidden=True,
+        format={"kind": "currency", "symbol": "$", "decimals": 2, "thousands": True},
+    )
+    rep.section("por_a").footer("Cierre: {{total.sub}}")
+    rep.group("global")
+    node = rep.run().root.children[0]
+    assert node.footer == "Cierre: $1,234.50"
