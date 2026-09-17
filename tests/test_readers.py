@@ -24,6 +24,14 @@ def test_coerce_scalars():
     assert _coerce(None) is None
 
 
+def test_coerce_non_finite_kept_as_str():
+    assert _coerce("nan") == "nan"
+    assert _coerce("NaN") == "NaN"
+    assert _coerce("inf") == "inf"
+    assert _coerce("-inf") == "-inf"
+    assert _coerce("infinity") == "infinity"
+
+
 # --- CSV ---
 def test_read_csv_path(tmp_path):
     path = tmp_path / "datos.csv"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -90,9 +91,12 @@ def _coerce(value: Any) -> Any:
     except ValueError:
         pass
     try:
-        return float(s)
+        f = float(s)
     except ValueError:
         pass
+    else:
+        if math.isfinite(f):
+            return f
     return value
 
 
@@ -259,7 +263,15 @@ class TuplesReader:
         """
         if columns is None:
             raise ValueError("`columns` requerido para reader 'tuples'")
-        return [dict(zip(columns, row)) for row in source]
+        rows: list[dict] = []
+        for row in source:
+            if len(row) != len(columns):
+                raise ValueError(
+                    f"la tupla {row!r} tiene {len(row)} campos, "
+                    f"pero `columns` declara {len(columns)}"
+                )
+            rows.append(dict(zip(columns, row)))
+        return rows
 
 
 class ExcelReader:
@@ -288,15 +300,19 @@ class ExcelReader:
             ) from exc
 
         wb = load_workbook(source)
-        ws = wb.active
-        rows_iter = ws.iter_rows(values_only=True)
-        header = next(rows_iter, None)
-        if header is None:
-            return []
-        rows: list[dict] = []
-        for values in rows_iter:
-            rows.append(dict(zip(header, values)))
-        return rows
+        try:
+            ws = wb.active
+            rows_iter = ws.iter_rows(values_only=True)
+            header = next(rows_iter, None)
+            if header is None:
+                return []
+            header = [h.lstrip("\ufeff") if isinstance(h, str) else h for h in header]
+            rows: list[dict] = []
+            for values in rows_iter:
+                rows.append(dict(zip(header, values)))
+            return rows
+        finally:
+            wb.close()
 
 
 _FORMAT_BY_EXT = {

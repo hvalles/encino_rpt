@@ -193,6 +193,18 @@ def test_markdown_escapes_pipe():
     assert "a\\|b" in md
 
 
+def test_markdown_escapes_link_parens():
+    rows = [{"id": 1}]
+    rep = Report(rows)
+    rep.link("ver", "report", href="/x?a=b)c", label="a|b", after="id")
+    rep.detail("id")
+    result = rep.run()
+
+    md = result.to_markdown()
+    assert "a\\|b" in md
+    assert "/x?a=b\\)c" in md
+
+
 def test_excel_renderer():
     pytest.importorskip("openpyxl")
     rows = [{"sku": "A", "cantidad": 2}, {"sku": "B", "cantidad": 1}]

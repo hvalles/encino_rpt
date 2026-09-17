@@ -173,9 +173,10 @@ class HtmlRenderer:
     def _cell_attrs(self, column, value, result) -> str:
         matched = _matched_rules(column, value, result.styles)
         if self.css:
-            if not matched:
+            classes = [i for i in matched if _css_decls(result.styles[i].style)]
+            if not classes:
                 return ""
-            return f' class="{" ".join(f"rpt-cond-{i}" for i in matched)}"'
+            return f' class="{" ".join(f"rpt-cond-{i}" for i in classes)}"'
         style: dict = {}
         for i in matched:
             style.update(result.styles[i].style)

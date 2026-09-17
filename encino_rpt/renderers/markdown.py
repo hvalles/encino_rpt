@@ -12,12 +12,23 @@ def _md_escape(value) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 
+def _md_url(value) -> str:
+    """Escapa una URL/atributo para `[](...)`/`![](...)` (tabla GFM + paréntesis)."""
+    return (
+        str(value)
+        .replace("|", "\\|")
+        .replace("\n", " ")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+    )
+
+
 def _md_cell(value, fmt) -> str:
     """Convierte un valor de celda a Markdown (Link/Image, o texto escapado)."""
     if isinstance(value, Link):
-        return f"[{value.label or value.href}]({value.href})"
+        return f"[{_md_escape(value.label or value.href)}]({_md_url(value.href)})"
     if isinstance(value, Image):
-        return f"![{value.alt or ''}]({value.src})"
+        return f"![{_md_escape(value.alt or '')}]({_md_url(value.src)})"
     return _md_escape(format_value(value, fmt))
 
 
