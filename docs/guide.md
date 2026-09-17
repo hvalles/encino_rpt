@@ -187,7 +187,7 @@ El `ReportResult` expone métodos de conveniencia que delegan en los renderers:
 | `render_html(classes=None, repeat_header=False)` | `str` HTML | — |
 | `to_csv(delimiter=",")` | `str` CSV | — |
 | `to_text()` | `str` texto plano | — |
-| `to_excel(ws=None, styles=None, formulas=False)` | hoja openpyxl | `excel` |
+| `to_excel(ws=None, formulas=False)` | hoja openpyxl | `excel` |
 | `to_pdf(repeat_header=True, **opts)` | `bytes` PDF | `pdf` |
 | `model_dump()` | JSON canónico | — |
 

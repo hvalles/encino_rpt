@@ -457,9 +457,9 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openpyxl", marker = "extra == 'excel'" },
-    { name = "pydantic", specifier = ">=2" },
-    { name = "reportlab", marker = "extra == 'pdf'" },
+    { name = "openpyxl", marker = "extra == 'excel'", specifier = ">=3.1.5" },
+    { name = "pydantic", specifier = ">=2,<3" },
+    { name = "reportlab", marker = "extra == 'pdf'", specifier = ">=5.0.1" },
 ]
 provides-extras = ["excel", "pdf"]
 

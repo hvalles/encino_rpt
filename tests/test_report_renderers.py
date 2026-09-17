@@ -460,20 +460,19 @@ def test_to_json_non_serializable_not_masked():
     assert "demasiado profunda" not in str(exc.value)
 
 
-def test_excel_styles_footer_dead_params():
+def test_excel_footer_renders_full_row():
     pytest.importorskip("openpyxl")
-    # regresión documenta bug conocido — ver CONCERNS.md §Tech Debt
-    # (styles/footer muertos)
+    # footer se renderiza como fila completa (los params muertos styles/footer
+    # column_position fueron eliminados — ver CONCERNS.md §Tech Debt resuelto).
     rows = [{"sku": "A", "monto": 100}]
     rep = Report(rows)
     rep.detail("sku", "monto")
     rep.group("global")
-    rep.section("global").footer("Total", column_position="monto")
+    rep.section("global").footer("Total")
     rep.section("global").total("sum", "monto")
     result = rep.run()
 
-    # styles y column_position son no-op (sin crash); el footer se renderiza como fila completa
-    ws = result.to_excel(styles={"bold": True})
+    ws = result.to_excel()
     assert "Total" in [c.value for row in ws.iter_rows() for c in row]
 
 

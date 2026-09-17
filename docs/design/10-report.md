@@ -342,7 +342,7 @@ La `Section` agrupa las piezas de presentación de un corte:
 # encino_rpt/section.py
 class Section:
     def header(self, template: str) -> "Section": ...
-    def footer(self, template: str, column_position: str | None = None) -> "Section": ...
+    def footer(self, template: str) -> "Section": ...
     def total(self, operator: str, column: str | None = None, *,
               expression: str | None = None, name: str | None = None,
               label: str | None = None, column_position: str | None = None,
@@ -439,7 +439,7 @@ rep.detail("sku", "descripcion", "cantidad", "precio", "total")
 
 rep.group("tot_agt", columns="id", show_collapsed=False, default_collapsed=False)
 rep.section("tot_agt").header("{{id}} Agente: {{agente}}")
-rep.section("tot_agt").footer("Total agente {{agente}}", column_position="agente")
+rep.section("tot_agt").footer("Total agente {{agente}}")
 rep.section("tot_agt").total("sum", "total")
 rep.section("tot_agt").total("sum", expression="es_par * total", label="Total (pares)")  # condicional
 rep.section("tot_agt").total("avg", "precio", label="Precio Promedio")
@@ -447,14 +447,14 @@ rep.section("tot_agt").total("count", "pedido_id")
 
 rep.group("tot_ped", columns="pedido_id", parent="tot_agt")
 rep.section("tot_ped").header("{{pedido_id}} Referencia: {{referencia}}  fecha:{{fecha}} estatus:{{estatus}}")
-rep.section("tot_ped").footer("Total pedido {{pedido_id}}", column_position="agente")
+rep.section("tot_ped").footer("Total pedido {{pedido_id}}")
 rep.section("tot_ped").total("sum", "total")
 
 rep.group("global")
 rep.section("global").header(
     "Reporte de Ventas por Agente del {{param.0}} al {{param.1}}")
 rep.section("global").footer(
-    "Total general {{total.total_gral}}", column_position="agente")  # {{total.NOMBRE}}
+    "Total general {{total.total_gral}}")  # {{total.NOMBRE}}
 rep.section("global").total("sum", "total", name="total_gral", column_position="total")
 rep.section("global").total("count", column_position="cantidad")
 rep.section("global").chart("pie", title="Ventas por agente",
@@ -761,7 +761,7 @@ imports perezosos (para no cargar dependencias opcionales):
 class ReportResult(BaseModel):
     ...
     def render_html(self, classes: dict | None = None, repeat_header: bool = False) -> str: ...   # HtmlRenderer
-    def to_excel(self, ws=None, styles: dict | None = None, formulas: bool = False): ...      # ExcelRenderer (extra openpyxl/xlsxwriter)
+    def to_excel(self, ws=None, formulas: bool = False): ...      # ExcelRenderer (extra openpyxl/xlsxwriter)
     def to_csv(self, delimiter: str = ",") -> str: ...                # CsvRenderer
     def to_text(self) -> str: ...                                     # TextRenderer
     def to_pdf(self, *, repeat_header: bool = True, **opts): ...      # PdfRenderer (extra reportlab/weasyprint)

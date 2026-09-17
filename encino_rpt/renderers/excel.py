@@ -20,19 +20,15 @@ _COLOR_OPS = {
 class ExcelRenderer:
     """Renderiza el `ReportResult` a una hoja de Excel (openpyxl)."""
 
-    def __init__(self, styles: dict | None = None, formulas: bool = False):
-        self.styles = styles or {}
+    def __init__(self, formulas: bool = False):
         self.formulas = formulas
 
-    def render(
-        self, result, ws=None, styles: dict | None = None, formulas: bool | None = None
-    ):
+    def render(self, result, ws=None, formulas: bool | None = None):
         """Convierte el resultado a una hoja de Excel.
 
         Args:
             result: El `ReportResult` a renderizar.
             ws: Hoja existente (None = crea un workbook nuevo).
-            styles: Estilos adicionales.
             formulas: Emitir `=SUM(...)` para totales `sum`.
 
         Returns:

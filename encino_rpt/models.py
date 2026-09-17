@@ -314,12 +314,11 @@ class ReportResult(BaseModel):
 
         yield from MarkdownRenderer().iter_markdown(self)
 
-    def to_excel(self, ws=None, styles: dict | None = None, formulas: bool = False):
+    def to_excel(self, ws=None, formulas: bool = False):
         """Renderiza el reporte a una hoja de Excel (openpyxl).
 
         Args:
             ws: Hoja existente (None = crea un workbook nuevo).
-            styles: Estilos adicionales.
             formulas: Emitir `=SUM(...)` para totales `sum` en lugar del valor.
 
         Returns:
@@ -327,7 +326,7 @@ class ReportResult(BaseModel):
         """
         from .renderers.excel import ExcelRenderer
 
-        return ExcelRenderer(styles=styles, formulas=formulas).render(self, ws=ws)
+        return ExcelRenderer(formulas=formulas).render(self, ws=ws)
 
     def to_json(self, *, indent: int | None = 2) -> str:
         """Serializa el reporte a JSON con schema versionado.

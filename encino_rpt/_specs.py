@@ -47,7 +47,6 @@ class ChartSpec:
     expression: str | None = None
     label_field: str | None = None
     options: dict | None = None
-    source: str | None = None
 
 
 @dataclass
@@ -60,7 +59,6 @@ class PivotSpec:
     title: str | None = None
     show_totals: bool = True
     options: dict | None = None
-    source: str | None = None
 
 
 @dataclass
@@ -87,7 +85,6 @@ class GroupSpec:
     source: str | None = None
     header: str | None = None
     footer: str | None = None
-    footer_column_position: str | None = None
     totals: list[TotalSpec] = field(default_factory=list)
     charts: list[ChartSpec] = field(default_factory=list)
     pivots: list[PivotSpec] = field(default_factory=list)

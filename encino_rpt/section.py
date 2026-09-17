@@ -23,18 +23,16 @@ class Section:
         self._spec.header = template
         return self
 
-    def footer(self, template: str, column_position: str | None = None) -> Section:
+    def footer(self, template: str) -> Section:
         """Fija el pie del corte.
 
         Args:
             template: Plantilla `{{campo}}`/`{{param.N}}`/`{{total.NOMBRE}}`.
-            column_position: Pista de presentación (columna bajo la que alinear).
 
         Returns:
             La propia sección (fluido).
         """
         self._spec.footer = template
-        self._spec.footer_column_position = column_position
         return self
 
     def total(
@@ -81,7 +79,6 @@ class Section:
         expression: str | None = None,
         label_field: str | None = None,
         options: dict | None = None,
-        source: str | None = None,
     ) -> Section:
         """Declara un gráfico dentro del corte.
 
@@ -94,15 +91,12 @@ class Section:
             label_field: Campo para etiquetar los subgrupos (None = primera
                 columna de agrupación).
             options: Pistas de estilo opcionales.
-            source: Conjunto de `add_dataset`.
 
         Returns:
             La propia sección (fluido).
         """
         self._spec.charts.append(
-            ChartSpec(
-                kind, title, operator, column, expression, label_field, options, source
-            )
+            ChartSpec(kind, title, operator, column, expression, label_field, options)
         )
         return self
 
@@ -117,7 +111,6 @@ class Section:
         title: str | None = None,
         show_totals: bool = True,
         options: dict | None = None,
-        source: str | None = None,
     ) -> Section:
         """Declara una matriz de doble entrada (cross-tab).
 
@@ -130,7 +123,6 @@ class Section:
             title: Título del pivote.
             show_totals: Añadir totales de fila/columna.
             options: Pistas de estilo opcionales.
-            source: Conjunto de `add_dataset`.
 
         Returns:
             La propia sección (fluido).
@@ -145,7 +137,6 @@ class Section:
                 title,
                 show_totals,
                 options,
-                source,
             )
         )
         return self

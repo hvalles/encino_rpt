@@ -30,12 +30,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "pydantic>=2",
+    "pydantic>=2,<3",
 ]
 
 [project.optional-dependencies]
-excel = ["openpyxl"]
-pdf = ["reportlab"]
+excel = ["openpyxl>=3.1.5"]
+pdf = ["reportlab>=5.0.1"]
 
 [project.urls]
 Repository = "https://github.com/hvalles/encino_rpt"
