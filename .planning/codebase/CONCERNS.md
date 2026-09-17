@@ -1,196 +1,208 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-09-16
-
-Scope: full repo — `encino_rpt` (report builder + renderers), `tests/`, `docs/`, CI.
-
-## Tech Debt
-
-**`Report.run()` is not idempotent — re-running doubles group children:**
-- Issue: `_build_group_tree` mutates the internal `GroupSpec.children` list via `append` on every run (`encino_rpt/aggregation.py:128-137`). Calling `run()` twice appends every `GroupSpec` to its parent twice.
-- Files: `encino_rpt/aggregation.py:117-137`, `encino_rpt/report.py:278-286`
-- Impact: Confirmed — `rep.run(); rep.run()` on a 2-agent report yields 4 root children instead of 2. Any caller that caches and re-runs a `Report` gets duplicated sections, double-counted totals, and confusing output.
-- Fix approach: Make `_build_group_tree` build a fresh tree (copy `GroupSpec` per run, or derive children adjacency from `_order` + `parent` without mutating the specs in place).
-
-**Declared-but-unimplemented features (design vs. implementation gap):**
-- Issue: `docs/design/10-report.md` (§8 mapping table, decisions #15/#29) promises Link→`<a>`/hyperlink/`<img>`, `page_break` page breaks in PDF/HTML, `repeat_header` in HTML, and `column_position` alignment. None are implemented in any renderer.
-- Files:
-  - `encino_rpt/models.py:117-119` — `show_collapsed`, `default_collapsed`, `page_break` stored on `Group`; `models.py:53` — `column_position` on `Total`
-  - `encino_rpt/_specs.py:38,84-86,90` — same fields carried in specs
-  - `encino_rpt/renderers/pdf.py:64` — only `repeat_header` used (PDF); `page_break` never read
-  - `encino_rpt/renderers/html.py:26-28` — `repeat_header` stored, never used anywhere in the renderer
-- Impact: Confirmed — a `link()`/`image()` column renders as the pydantic repr (`type='link' target='report' href='/pedido/1' label='Ver' params={}`) in CSV, HTML, text and PDF output. `Section.page_break()` has zero effect on output. `column_position`/`footer_column_position` are dead hints. Callers relying on the documented behavior get text soup instead of links/images.
-- Fix approach: Either implement Link/Image handling in `html.py` (anchor/img tags), `excel.py` (`cell.hyperlink`), `csv.py` (`label`/`href` text) and honor `page_break` in `pdf.py` (`PageBreak()`), or strip the dead fields/parameters and update the docs to match reality.
-
-**Unused runtime dependency `encino-orm`:**
-- Issue: `pyproject.toml:33` declares `encino-orm>=0.2.1` as a hard runtime dependency, but nothing in `encino_rpt/` or `tests/` imports it (the package consumes plain `list[dict]`).
-- Files: `pyproject.toml:32-35`
-- Impact: Every install pulls in an unnecessary package (and its transitive deps) for a pure-in-memory library that only needs `pydantic`.
-- Fix approach: Remove `encino-orm` from `dependencies` (keep it in an optional dev/example group if needed for integration docs).
-
-**Raw, context-free exceptions escape the aggregation pipeline:**
-- Issue: `_value_for`/`evaluate` callers in the enrichment/aggregation loop (`encino_rpt/aggregation.py:53,102,173`) do not wrap per-expression errors. Confirmed: a total `expression="a/0"` raises a bare `ZeroDivisionError`; an unregistered `custom:` aggregate raises a bare `KeyError` (`aggregation.py:51`); an unknown expression name raises `ExpressionError`. All abort the entire `run()` with no indication of which group/row/field failed.
-- Files: `encino_rpt/aggregation.py:48-62,90-113,166-179`, `encino_rpt/expressions.py:50-109`
-- Impact: One bad row in a large dataset kills the whole report with a stack trace that gives no context. Hard to diagnose in production.
-- Fix approach: Wrap row/field evaluation with a contextual error (group name, field name, row index) and/or continue-on-error policy.
-
-**Silent failure modes mask configuration mistakes:**
-- Issue: An unknown `source=` on a group falls back to the main dataset (`sources.get(spec.source, sources[None])` at `encino_rpt/aggregation.py:157`, and `report._datasets.get(source, [])` at `aggregation.py:91`). Unknown template tokens render as empty string (`encino_rpt/template.py:28` — `ctx.get(token, "")`). A typo like `{{totals.monto}}` renders `x=` silently.
-- Files: `encino_rpt/aggregation.py:91,157`, `encino_rpt/template.py:18-28`
-- Impact: Wrong dataset or a typo'd template header produces subtly wrong reports (empty headers, wrong numbers) with no warning. Confirmed: `render("x={{totals.monto}}", {...})` → `"x="`.
-- Fix approach: Raise on unknown `source=` at declaration/run time; raise (or emit a strict-mode warning) on unresolved `{{token}}` instead of empty-string substitution.
+**Analysis Date:** 2026-09-17
 
 ## Known Bugs
 
-**Excel `formulas=True` emits `SUM` ranges that double-count subtotals and chart aux data:**
-- Symptoms: With nested groups and/or charts, the group `SUM` range spans every row written between the group start marker and the total — including child subtotal rows and chart scratch data.
-- Files: `encino_rpt/renderers/excel.py:79-96` (`start`/`_sum_formula`) and `excel.py:168-199` (`_chart` writes aux rows in the same columns)
-- Trigger: `global.total("sum", "total")` with `to_excel(formulas=True)` over grouped+charted data.
-- Confirmed: output contains `B10: =SUM(B2:B9)` covering child subtotal rows (B3, B5) and chart series data (B8) — the "global total" of a 300-value report becomes 700.
-- Fix approach: Track the exact detail-row span per group (record row range only over `Detail` children), or compute SUM per contiguous leaf range and subtract/avoid dupes; exclude chart aux rows from the range.
+**`detail(source=...)` is silently ignored (multi-query detail no-op):**
+- Symptoms: Passing `source="presupuesto"` to `Report.detail(...)` has no effect; detail rows are always taken from the primary dataset.
+- Files: `encino_rpt/report.py:211-222` — `def detail(self, *columns, source=None)` stores `self._detail = list(columns)` and never uses `source`.
+- Trigger: `rep.add_dataset("presupuesto", rows)` then `rep.detail("monto", source="presupuesto")`.
+- Impact: Multi-query detail is documented in the design contract (`docs/design/10-report.md:890`) and advertised in `README.md:42`, but does not work. Only `group`/`chart`/`pivot`/`add_field`/`kpi` honor `source=` (`aggregation.py:178,420`).
+- Workaround: None — detail-level `source` cannot be expressed.
 
-**Excel total rows bypass formula-injection sanitization:**
-- Symptoms: `_total_row` writes the label and value with raw `ws.cell(...)` (`encino_rpt/renderers/excel.py:141-142`) instead of `write_excel_cell`; column headers are written raw too (`excel.py:66`).
-- Trigger: A total label/name like `=1+1` or a column named `=HYPERLINK("x")`.
-- Confirmed: cell A4 written as `data_type='f'` (live formula) for a label `=1+1`.
-- Fix approach: Route every cell write through `_sanitize.write_excel_cell` (`encino_rpt/renderers/_sanitize.py:20-27`), including headers and total rows.
+**Named totals that resolve to `None` crash the registry:**
+- Symptoms: `TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'` during `run()`.
+- Files: `encino_rpt/aggregation.py:203` — `registry[key] = registry.get(key, 0) + val` runs outside the `_wrap(...)` guard.
+- Trigger: A named total (`total(..., name="x")`) using `avg`, `max`, `min`, or `count_distinct` over a group whose values are all `None` returns `None` (`aggregation.py:52-60`), then `0 + None` raises.
+- Workaround: Avoid naming totals that can be empty, or ensure the column is non-null.
 
-**`format_value` loses precision on large numbers when `decimals=None`:**
-- Symptoms: `Format()` defaults `decimals=None`; the formatter uses `f"{abs(num):g}"` (`encino_rpt/renderers/_format.py:29`) which truncates to 6 significant digits and emits scientific notation.
-- Confirmed: `format_value(1000000.5, Format())` → `'1e+06'`; `format_value(1234567.89, Format())` → `'1.23457e+06'`. Catastrophic for a financial reporting library.
-- Files: `encino_rpt/renderers/_format.py:21-38`
-- Fix approach: Use `repr`/full-precision formatting (e.g. `str(num)` or `f"{num:.10g}"` with a higher guard) when `decimals is None`, and add a regression test for 7+ digit values.
+**`suppress_zero(column=...)` with a missing column removes every child:**
+- Symptoms: All children of a section disappear when `suppress_zero` references a column not present in the grouping key.
+- Files: `encino_rpt/aggregation.py:362-378` (`_is_zero`) — `v = child.key.get(column)` yields `None` when the column is absent, and `return v is None or v == 0` returns `True`.
+- Trigger: `rep.section("x").suppress_zero(column="columna_inexistente")`.
+- Workaround: Only suppress on columns that are actually part of the grouping key or detail. (Tracked in `.planning/PROJECT.md:51`.)
 
-**`order_by(total=...)` with a missing/unmatched total name crashes with raw `TypeError`:**
-- Symptoms: `_sort_key` returns `None` when the named total isn't found (`encino_rpt/aggregation.py:294-298`), then `sorted` compares `None` against `None`/numbers.
-- Confirmed: `TypeError: '<' not supported between instances of 'NoneType' and 'NoneType'`.
-- Files: `encino_rpt/aggregation.py:277-307`
-- Fix approach: Raise a clear error at run time naming the missing total, or define a total-ordered fallback key (e.g. `-inf` sentinel).
+**Unhashable grouping/pivot values raise raw `TypeError`:**
+- Symptoms: `TypeError: unhashable type: 'list'` (or `'dict'`) when a grouping column holds a list/dict (e.g. a JSON column).
+- Files: `encino_rpt/aggregation.py:167` (`key = tuple(r.get(c) for c in spec.columns)`), `encino_rpt/pivot.py:25` (`buckets.setdefault((rv, cv), [])`) and `encino_rpt/pivot.py:47-54` (`_ordered_unique` uses `set`).
+- Trigger: Grouping or pivoting by a column whose values are non-hashable.
+- Workaround: Materialize/stringify the column before grouping.
 
-**`order_by(expression=...)` evaluates without the report's custom functions:**
-- Symptoms: `_sort_key` calls `evaluate(expression, ..., {})` with an empty functions dict (`encino_rpt/aggregation.py:300`), while every other evaluation site passes `report._functions`.
-- Confirmed: `order_by(expression="doblado(monto)")` after `add_function("doblado", ...)` raises `ExpressionError: función no permitida: 'doblado'`.
-- Files: `encino_rpt/aggregation.py:290-307`
-- Fix approach: Thread `report._functions` into `_apply_order`/`_sort_key` (and `report._aggregates` where relevant).
+**Missing/`None` path column produces a spurious `"None"` segment:**
+- Symptoms: A `path=` group over a column with `None`/missing values creates a literal `"None"` hierarchy segment.
+- Files: `encino_rpt/aggregation.py:211` — `_segs` does `str(r.get(spec.path, ""))`, so `None` becomes `"None"`.
+- Trigger: Rows lacking the path column or holding `None`.
+- Workaround: Guarantee non-null path values, or filter rows beforehand.
 
-**`run()` idempotency** — see Tech Debt (first item); it is a correctness bug, not just debt.
+**`count` over an expression counts truthy values, not rows:**
+- Symptoms: `count` with an `expression=` yields a different result than `count` without one.
+- Files: `encino_rpt/aggregation.py:73-74` — `sum(1 for v in vals if v)` (truthy count) vs. `aggregation.py:78-79` — `len(rows)` (row count).
+- Trigger: `section.total("count", expression="IF(monto > 0)")` returns the count of non-zero results, not the number of rows.
+- Workaround: Use `count_distinct` or a `sum` expression to disambiguate; semantics are undocumented.
+
+## Tech Debt
+
+**Engine couples tightly to private `Report` state:**
+- Issue: `aggregation.py` reads `report._rows`, `report._datasets`, `report._fields`, `report._functions`, `report._groups`, `report._order`, `report._aggregates`, `report._kpis`, `report._detail`, `report._formats`, `report._styles`, `report._params`, `report._title` directly (e.g. `aggregation.py:91-135,385-458`). `_sort_key`/`_is_zero` also read the private pydantic attr `child._first_row` (`aggregation.py:348,362-378`).
+- Impact: Any rename or refactor of the builder's internal layout breaks the engine; the coupling cannot be caught by tests alone.
+- Fix approach: Add accessor methods/properties on `Report` (e.g. `report.datasets`, `report.fields`) and thread an explicit context object through `build()` rather than reaching into `_`-prefixed attributes.
+
+**Duplicated comparison-operator dispatch tables:**
+- Issue: The same `lt/le/gt/ge/eq/ne` lambda tables are defined three times — `_OPS` in `encino_rpt/renderers/html.py:12-19`, `_COLOR_OPS` in `encino_rpt/renderers/excel.py:10-17`, and `_CMP` in `encino_rpt/expressions.py:21-28`.
+- Impact: Divergence risk (a new comparison operator must be added in three places); no single source of truth.
+- Fix approach: Extract a shared `compare(op, a, b)` helper into a small internal module.
+
+**`footer(column_position=...)` is a dead parameter:**
+- Issue: `Section.footer(column_position=...)` stores `footer_column_position` (`encino_rpt/section.py:37`, `_specs.py:90`), but it is never read by `aggregation.py` or any renderer (grep confirms write-only). Contrast `Total.column_position`, which is honored by `excel.py:105`.
+- Impact: Users pass a layout hint that silently does nothing.
+- Fix approach: Either implement footer alignment in the renderers or remove the parameter and document it.
+
+**`ExcelRenderer` `styles` parameter/attribute is dead:**
+- Issue: `ExcelRenderer.__init__(styles=...)` stores `self.styles` (`encino_rpt/renderers/excel.py:24`) but never uses it; `render(..., styles=None)` accepts `styles` (`excel.py:27`) and ignores it. `ReportResult.to_excel(styles=...)` (`encino_rpt/models.py:187-200`) threads the value through, but nothing styles the worksheet.
+- Impact: The "additional styles" option in `to_excel(styles=...)` is a no-op.
+- Fix approach: Wire `self.styles` into `_write_value`/`_full_row`/`_total_row`, or drop the parameter.
+
+**Codebase-map docs are stale relative to the code:**
+- Issue: `AGENTS.md` (and its embedded STACK/CONVENTIONS/ARCHITECTURE) describe 5 renderers with per-renderer `_walk` visitors, but the code now has 6 renderers (`JsonRenderer`) plus a shared iterative traversal in `encino_rpt/renderers/_walk.py`. The STACK section still lists `encino-orm` as a declared dependency, though it was removed (DEP-01).
+- Impact: New contributors and the planner/executor load incorrect context.
+- Fix approach: Re-run the codebase map after Phase 8 to refresh STACK/ARCHITECTURE/CONVENTIONS.
+
+**`ReportResult` docstring omits `to_json`:**
+- Issue: `encino_rpt/models.py:139-141` lists `render_html`, `to_csv`, `to_text`, `to_excel`, `to_pdf` but not the newer `to_json` (`models.py:202-213`).
+- Impact: Doc drift in the public API surface.
+
+**`encino_rpt/__init__.py` import-alignment outlier:**
+- Issue: `from .models import (...)` aligns items to column 21 (`encino_rpt/__init__.py:3-17`), inconsistent with the one-item-per-line style used elsewhere (e.g. `renderers/__init__.py`).
+- Impact: Cosmetic; `ruff check` does not flag it.
 
 ## Security Considerations
 
-**CSS injection in HTML conditional styles:**
-- Risk: Inline `style` attribute values are HTML-escaped but not CSS-escaped (`encino_rpt/renderers/html.py:108-124`). A style value containing `;` injects arbitrary CSS declarations inside the quoted attribute.
-- Confirmed: `add_style("total", when="lt", value=0, background="red;position:fixed")` renders `style="background:red;position:fixed"` — unbounded extra declarations (still HTML-escaped, so `"` cannot break the attribute, but `position:fixed;opacity:0` overlays/UI-redress are possible).
-- Files: `encino_rpt/renderers/html.py:108-124`, `tests/test_security.py:45-54` (only tests `"` and property-name injection, not `;` values)
-- Current mitigation: property names validated by `_SAFE_PROP` (`html.py:20`); attribute quoting via `_esc`.
-- Recommendations: Reject or encode `;`/whitespace-injection characters in style values, or validate values against a strict allowlist (colors/lengths only).
+**`evaluate` does not wrap `ValueError` from `ast.parse` on null bytes:**
+- Risk: An expression string containing a null byte (`"\x00"`) makes `ast.parse` raise `ValueError("source code string cannot contain null bytes")`, which escapes as a raw `ValueError` instead of `ExpressionError`.
+- Files: `encino_rpt/expressions.py:57-60` — only `RecursionError`/`MemoryError`/`SyntaxError` are caught.
+- Current mitigation: None for this specific input.
+- Recommendations: Catch `ValueError` (and `TypeError`) in the `ast.parse` guard and re-raise as `ExpressionError`, matching the other malformed-input cases.
 
-**Excel formula injection gaps beyond detail cells:**
-- Risk: `_sanitize.write_excel_cell` covers detail/KPI/pivot/chart cells, but total labels/values and column headers bypass it (see Known Bugs). A user-supplied label starting with `=` becomes a live formula when the file is opened.
-- Files: `encino_rpt/renderers/excel.py:66,141-142`, `encino_rpt/renderers/_sanitize.py:20-27`
-- Recommendations: Route all writes through `write_excel_cell`.
+**JSON renderer `schema_version` key could be silently overridden:**
+- Risk: `JsonRenderer.to_dict` builds `{"schema_version": SCHEMA_VERSION, **result.model_dump(mode="json")}` (`encino_rpt/renderers/json.py:27`). If a model field named `schema_version` is ever added, the spread silently overwrites the constant.
+- Current mitigation: None today (no such field exists).
+- Recommendations: Emit `schema_version` after the spread, or namespace it (`"meta": {"schema_version": ...}`), and pin it to the package version rather than the hardcoded `"1.0"`.
 
-**CSV formula-injection sanitizer bypassable with a leading space:**
-- Risk: `is_dangerous` checks `value.startswith(("=", "+", "-", "@", "\t", "\r"))` (`encino_rpt/renderers/_sanitize.py:5`) — a value like `" =1+1"` (leading space, common in pasted data) or `"\x0c=1+1"` passes through unsanitized and Excel still evaluates it (Excel tolerates a leading space before `=`).
-- Files: `encino_rpt/renderers/_sanitize.py:5-17`, used by `encino_rpt/renderers/csv.py:31-58`
-- Current mitigation: simple prefix list.
-- Recommendations: Trim/scan whitespace (`value.lstrip().startswith(...)`) per OWASP guidance; also prefix a `'` when the value contains a leading BOM/whitespace followed by a dangerous char.
-
-**Expression evaluator DoS edge cases leak raw exceptions:**
-- Risk: `_MAX_POW_EXP` is only enforced when the exponent is an `int` (`encino_rpt/expressions.py:80-81`); a float exponent like `2 ** 1e100` bypasses the check and raises a raw `OverflowError`. Pathologically nested expressions can raise `RecursionError` from `ast.parse` before the node-count guard runs.
-- Files: `encino_rpt/expressions.py:44-60,80-81`
-- Current mitigation: `_MAX_NODES`/`_MAX_DEPTH`/`_MAX_POW_EXP` guards (`expressions.py:45-47`), covered by `tests/test_security.py:31-41`.
-- Recommendations: Guard `Pow` for both int and float exponents; catch `RecursionError`/`MemoryError` around `ast.parse` and re-raise as `ExpressionError`; add regression tests.
+**Excel formula mode intentionally bypasses cell sanitization:**
+- Risk: When `formulas=True`, `_total_row` writes the generated `=SUM(...)` string via `ws.cell(self._row, col_idx, value)` directly, skipping `write_excel_cell` (`encino_rpt/renderers/excel.py:178`).
+- Current mitigation: The formula string is generated internally by `_sum_formula` (`excel.py:138-158`) from row indices only — no user input — so it is safe today.
+- Recommendations: Preserve this bypass only for internally-generated formulas; never pass user-controlled strings through this path. Add a regression test asserting user values are never written as live formulas in `formulas=True` mode.
 
 ## Performance Bottlenecks
 
-**Pivot row/column totals are quadratic in unique values:**
-- Problem: `build_pivot` computes `row_totals` and `col_totals` by rescanning all rows per unique value (`encino_rpt/pivot.py:28-33`) — O(rows × uniques). A pivot over a high-cardinality column (e.g. 50k rows × 10k SKUs) does 500M row visits.
-- Files: `encino_rpt/pivot.py:14-43`
-- Improvement path: Accumulate row/column totals in the same single pass that builds `buckets` (`pivot.py:19-26`).
-
-**Path groups re-split every row at every level and recurse unboundedly:**
-- Problem: `_make_path_node` calls `_segs` for every row at every level (`encino_rpt/aggregation.py:190-231`), so a row at depth D is split D+1 times (O(n × depth)). Recursion depth equals the path depth, so `aggregation.py:217-228` hits Python's default recursion limit — confirmed `RecursionError` with a 1200-segment path.
-- Files: `encino_rpt/aggregation.py:182-231`
-- Improvement path: Split each row's path once up front and bucket by segment arrays; use an iterative (stack-based) tree builder to remove the recursion limit.
-
-**Full-row dict copies per field and per dataset:**
-- Problem: `_enrich` copies each row (`dict(row)` at `encino_rpt/aggregation.py:95`) for the main dataset and again for every `add_dataset` source; the report also retains the raw `_rows`/`_datasets` list for the lifetime of the `Report` object. Peak memory ≈ 2× input + copies.
-- Files: `encino_rpt/aggregation.py:90-113`, `encino_rpt/report.py:27-38`
-- Improvement path: Acceptable for in-memory design (documented non-objective in `docs/design/10-report.md:36-39` — heavy aggregates belong in SQL `ROLLUP`/`CUBE`); consider lazily enriching datasets only when referenced.
+**Deep trees survive `run()` and rendering but not JSON serialization:**
+- Problem: Aggregation and renderers are iterative (deep path trees to depth 1100 are tested — `tests/test_report.py:418-436`, `tests/test_report_renderers.py:301-314`), but `model_dump()` / `model_validate()` / `json.dumps` on a deeply nested `Group.children` chain are recursive and may raise `RecursionError`.
+- Files: `encino_rpt/models.py:121` (`Group.children`), `encino_rpt/renderers/json.py:23`.
+- Cause: pydantic v2 serialization and `json.dumps` recurse over the nested model tree; the iterative `_walk` (`encino_rpt/renderers/_walk.py`) only helps the renderers.
+- Improvement path: Add a test for `to_json()`/`model_dump()` on a >1000-deep path tree; if it fails, provide a depth-safe serialization path or document a max depth.
 
 ## Fragile Areas
 
-**`encino_rpt/aggregation.py` — the whole build pipeline:**
-- Files: `encino_rpt/aggregation.py:117-406`
-- Why fragile: It mutates shared `GroupSpec` objects (`_build_group_tree` appends children; `_apply_order` re-sorts in place), depends on declaration order (`parent` must precede child, otherwise the child silently attaches to root — `aggregation.py:128-136`), silently tolerates duplicate group names (`report.py:257` overwrites while `_order` appends twice → duplicated children on the next run), and mixes presentation (chart/pivot build) into aggregation.
-- Safe modification: Treat `GroupSpec` as immutable input; build a fresh internal node graph per `run()`; validate parent names, duplicate names, and `custom:` names up front.
-- Test coverage: `tests/test_report.py` covers happy paths only — no tests for `run()` twice, parent-declared-after-child, duplicate group names, or missing datasets.
+**`ExcelRenderer` holds mutable render state on the instance:**
+- Files: `encino_rpt/renderers/excel.py:51-54` (`self._ws`, `self._result`, `self._formulas`, `self._row`); also `PdfRenderer` sets `self._normal` (`encino_rpt/renderers/pdf.py:44`).
+- Why fragile: `render()` is not re-entrant. Calling it twice on the same renderer instance overwrites `_ws`/`_result` and starts `_row` at 1 again; concurrent use of a shared renderer corrupts output.
+- Safe modification: Keep all per-render state local to `render()` (pass `ws`/row counter explicitly) or document single-use and refuse reuse.
 
-**Renderer traversal duplicated with divergent edge behavior:**
-- Files: `encino_rpt/renderers/html.py:51-101`, `encino_rpt/renderers/csv.py:35-57`, `encino_rpt/renderers/text.py:27-55`, `encino_rpt/renderers/excel.py:72-114`, `encino_rpt/renderers/pdf.py:77-103`
-- Why fragile: Five hand-maintained copies of the same tree walk with subtly different handling (Excel keeps per-group `start` state and a mutable `self._ws`/`self._row`/`self._result` on the instance — a shared `ExcelRenderer` instance is not re-entrant for concurrent renders; CSV emits rows without a trailing newline; PDF nests pivot tables inside table cells). Fixes to one renderer (e.g. the `SUM` range bug) must be replicated across the others.
-- Safe modification: Extract a shared iterator that yields typed "rows" (group header, detail, total, chart, pivot) once, and have each renderer consume it; make `ExcelRenderer.render()` use locals instead of instance state.
+**Chart/pivot value errors are not wrapped with context:**
+- Files: `encino_rpt/aggregation.py:308-316` — `build_chart`/`build_pivot` receive `_make_value_fn` lambdas and call them directly, unlike totals and KPIs which route through `_wrap` (`aggregation.py:194-198,421-425`).
+- Why fragile: A bad expression or unknown aggregate in a chart/pivot raises a raw `ExpressionError`/`TypeError` with no group/field context, inconsistent with the error story elsewhere.
+- Safe modification: Wrap `value_fn` calls in `_wrap` with a `"gráfico/pivote (grupo …)"` context label.
+- Test coverage: No test exercises a failing chart/pivot expression.
 
-**`encino_rpt/expressions.py` — the whitelist evaluator:**
-- Files: `encino_rpt/expressions.py:54-109`
-- Why fragile: Any new operator/function must be whitelisted here and in `docs/security.md`; raw arithmetic exceptions (`ZeroDivisionError`, `OverflowError`) and parse-level `RecursionError` escape without `ExpressionError` wrapping; `evaluate` is called from 4 sites (`aggregation.py:53,102,173,300`) with inconsistent function-dict arguments (one passes `{}`).
-- Test coverage: `tests/test_report.py:8-39`, `tests/test_security.py:31-41` — good rejection coverage; missing float-exponent and deep-nesting cases.
+**Empty-group aggregate semantics are asymmetric:**
+- Files: `encino_rpt/aggregation.py:47-61`.
+- Why fragile: `sum` → `0`, `count` → `0`, but `avg`/`max`/`min`/`count_distinct` → `None`. Downstream consumers must handle both, and numeric contexts (registry accumulation, ordering by total) can break on `None`.
+- Safe modification: Document the `None`-vs-`0` contract explicitly, or make it uniform (e.g. return `None` for all empty aggregates).
 
 ## Scaling Limits
 
-**In-memory aggregation on full result sets:**
-- Current capacity: Entire `list[dict]` input held in memory; copied once per dataset in `_enrich` (`encino_rpt/aggregation.py:90-113`).
-- Limit: Memory-bound; design doc explicitly defers heavy aggregates to SQL `GROUP BY ROLLUP`/`CUBE` (`docs/design/10-report.md:36-39`).
-- Scaling path: Pre-aggregate in SQL; use the report builder only for assembly/presentation, per the documented design.
-
-**Path-group depth limited by Python recursion (~1000):**
-- Current capacity: reliable to ~900 segments per path.
-- Limit: `RecursionError` at deeper hierarchies (confirmed at 1200).
-- Scaling path: iterative builder in `_make_path_node`.
-
-**Pivot cardinality:**
-- Limit: O(rows × unique values) for totals (`encino_rpt/pivot.py:28-33`); see Performance.
+**In-memory design is a documented no-goal:**
+- Current capacity: The library holds all rows and the full result tree in memory (`Report.__init__` copies rows into `self._rows`, `encino_rpt/report.py:27`).
+- Limit: Memory-bound on large row sets; no streaming or SQL pushdown.
+- Scaling path: Heavy aggregation is delegated to SQL `ROLLUP`/`CUBE` upstream (documented in `docs/design/10-report.md §11` and `REQUIREMENTS.md` "Out of Scope"). Not a defect, but a hard boundary to respect.
 
 ## Dependencies at Risk
 
-**`pydantic>=2` (runtime core):**
-- Risk: Only hard dependency; `Group` uses forward refs + `model_rebuild()` (`encino_rpt/models.py:121,217`); `Link`/`Image`/`Total` carry unconstrained `Any` fields (`models.py:17,52,77`), so schema drift between `model_dump` and `model_validate` round-trips is theoretically possible.
-- Impact: Low — pinned `>=2`, tested round-trip in `tests/test_report.py:235-243`.
-- Migration plan: None needed; add a CI job on pydantic 2.x latest to catch breaking releases early.
+**`pydantic>=2` has no upper bound:**
+- Risk: `pyproject.toml:33` declares `pydantic>=2` unbounded. The entire model layer (`encino_rpt/models.py`) is pydantic v2, so a future pydantic minor bump can introduce deprecations or behavior changes silently.
+- Impact: Breaking changes to `model_dump`/`model_validate`/`PrivateAttr` would ripple through serialization and the deep-tree path.
+- Migration plan: Pin an upper bound (e.g. `<3`) or pin an exact tested minor in CI, and add a smoke test that exercises `model_dump`/`model_validate` round-trips on the Python matrix.
 
-**`encino-orm>=0.2.1`:** unused hard dependency — see Tech Debt.
+**Optional extras are unpinned at install time:**
+- Risk: `[project.optional-dependencies]` lists `openpyxl` and `reportlab` with no version constraints (`pyproject.toml:37-38`); only `uv.lock` pins them.
+- Impact: Users installing `encino-rpt[excel]`/`[pdf]` from PyPI get floating versions, so the published package's real dependency set is not reproducible outside `uv`.
+- Migration plan: Add minimum-version constraints to the extras (matching the lockfile) so published installs are reproducible.
 
-**`openpyxl` / `reportlab` (optional extras):**
-- Risk: Only exercised via `pytest.importorskip` in tests (`tests/test_report_renderers.py:67,84,100,113`); the `excel`/`pdf` extras are not installed by the default `uv sync --group dev` — CI only installs them via the `dev` group in `pyproject.toml:50-55` (they are also listed there), so CI does exercise them.
-- Impact: Low. `docs.yml`/`publish.yml` workflows don't run tests against them by default but `ci.yml:24` (`uv sync --all-extras --group dev`) does.
+**Stale build artifacts in `dist/`:**
+- Risk: `dist/` contains `encino_rpt-0.2.0` wheel/sdist while `pyproject.toml:10` declares `0.2.1`. The directory is gitignored, and `publish.yml` runs `uv build` (`.github/workflows/publish.yml:19`), so it regenerates — but locally the artifacts are misleading.
+- Impact: Low; risk of accidentally shipping the old version if a manual release step is used.
+- Migration plan: Delete `dist/` locally or rebuild before release.
 
 ## Missing Critical Features
 
-**Link/Image columns are not rendered as links/images anywhere** (see Tech Debt). The `Link`/`Image` models, the `Report.link()`/`Report.image()` builders, and the `<a>`/`<img>` output promised in the design doc exist, but all five renderers fall back to `str(pydantic_model)`.
+**Multi-query detail rows:**
+- Problem: `detail(source=...)` is accepted but non-functional (see Known Bugs). Per-dataset detail columns — a documented multi-query use case (`docs/design/10-report.md:890`, `README.md:42`) — cannot be produced.
+- Blocks: Building a report whose detail section draws from a secondary `add_dataset` set.
 
-**`page_break`, `show_collapsed`/`default_collapsed`, `column_position`** have no rendering effect (see Tech Debt).
+**No shared operator/comparator module:**
+- Problem: Comparison and arithmetic operators are re-declared across `expressions.py`, `html.py`, and `excel.py` (see Tech Debt), so adding a new operator requires touching multiple files.
 
 ## Test Coverage Gaps
 
-**Untested areas:**
-- Multi-dataset (`add_dataset` + `source=`) — zero tests, yet it is a headline feature with silent-fallback behavior (`aggregation.py:91,157`).
-- Excel chart and pivot rendering (`excel.py:168-215`), PDF pivot (`pdf.py:105-114`) — rendered but never asserted aside from byte-magic.
-- `run()` called twice on the same `Report` (idempotency bug — see above).
-- `order_by` with `expression=`, missing totals, `suppress_zero` with column vs total — only `order_by(total=...)` happy path tested (`tests/test_report.py:182-195`).
-- Cumulative fields with non-zero `start`; conditional totals with `count`.
-- Error paths: unknown `source=`, unregistered `custom:` aggregate, division by zero, unknown template tokens.
-- Large-number formatting (`format_value` precision bug).
-- Link/Image output content in renderers.
-- Deep path hierarchies (>900 levels) — RecursionError.
+**Multi-dataset happy path:**
+- What's not tested: `add_dataset(name, rows)` + `source=` on `group`/`chart`/`pivot`/`add_field`/`kpi` has no end-to-end test. Only the design doc shows usage.
+- Files: `tests/test_report.py`, `tests/test_report_renderers.py`.
+- Risk: The `source` fallback (`sources.get(spec.source, sources[None])` in `aggregation.py:178`) and the field-source filtering (`aggregation.py:116`) are untested; regressions would go unnoticed.
+- Priority: High.
 
-- Files: `tests/test_report.py` (269 lines), `tests/test_report_renderers.py` (120 lines), `tests/test_security.py` (63 lines)
-- Risk: High — the Excel `SUM` double-count and precision bugs shipped despite the suite passing.
-- Priority: High
+**`suppress_zero` with a missing column:**
+- What's not tested: The `_is_zero` false-positive that deletes all children (Known Bugs).
+- Files: `encino_rpt/aggregation.py:362-378`; no test in `tests/`.
+- Risk: Silent data loss in reports.
+- Priority: High.
 
-**CI gaps:**
-- `.github/workflows/ci.yml:29-30` runs `ruff check` and `pytest` only — no type checker (mypy/pyright), no `ruff format --check`, no coverage gate, no performance/smoke benchmark for large inputs.
-- Priority: Medium
+**Named totals returning `None`:**
+- What's not tested: A named `avg`/`max`/`min`/`count_distinct` total over an all-`None` column crashes the registry (Known Bugs).
+- Files: `encino_rpt/aggregation.py:203`.
+- Risk: `TypeError` at runtime for valid reports.
+- Priority: Medium.
+
+**Unhashable grouping/pivot values:**
+- What's not tested: Grouping or pivoting by a column holding lists/dicts (Known Bugs).
+- Files: `encino_rpt/aggregation.py:167`, `encino_rpt/pivot.py:25,47-54`.
+- Risk: Raw `TypeError` with no actionable message.
+- Priority: Medium.
+
+**Deep-tree JSON serialization:**
+- What's not tested: `to_json()` / `model_dump()` on a >1000-deep path tree (only `run()` and text/HTML renderers are exercised at depth).
+- Files: `tests/test_report.py:418-436`, `tests/test_report_renderers.py:301-314`.
+- Risk: `RecursionError` in pydantic/json for deep hierarchies (see Performance).
+- Priority: Medium.
+
+**`detail(source=...)` behavior:**
+- What's not tested: The no-op `source` parameter on `detail` (Known Bugs).
+- Files: `encino_rpt/report.py:211-222`.
+- Risk: The gap persists because no test asserts the documented behavior.
+- Priority: Medium.
+
+**`ExcelRenderer` `styles` and `footer(column_position=...)`:**
+- What's not tested: Both features are dead (Tech Debt); no test would fail because neither is wired.
+- Files: `encino_rpt/renderers/excel.py:24,27`, `encino_rpt/section.py:37`.
+- Risk: The no-op behavior is silently accepted.
+- Priority: Low.
+
+**CI hardening (Phase 8 not started):**
+- What's not enforced: CI runs only `pytest` and `ruff check` (`.github/workflows/ci.yml:26-30`). There is no type checker (`mypy`/`pyright`), no `ruff format --check`, no coverage gate, and no performance smoke test — all listed as Phase 8 success criteria (`ROADMAP.md:139-140`).
+- Files: `.github/workflows/ci.yml`.
+- Risk: Formatting drift and type errors can land unnoticed; coverage can regress without detection.
+- Priority: High (this is the remaining planned phase).
 
 ---
 
-*Concerns audit: 2026-09-16*
+*Concerns audit: 2026-09-17*
