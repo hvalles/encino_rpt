@@ -30,7 +30,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "encino-orm>=0.2.1",
     "pydantic>=2",
 ]
 
