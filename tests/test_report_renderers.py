@@ -552,3 +552,29 @@ def test_to_pdf_file_writes():
     buf = io.BytesIO()
     assert result.to_pdf(file=buf) is None
     assert buf.getvalue().startswith(b"%PDF")
+
+
+def test_from_dict_missing_keys_use_defaults():
+    from encino_rpt import ReportResult
+
+    result = _streaming_report()
+    data = result.to_dict()
+    partial = {"root": data["root"]}
+    restored = ReportResult.from_dict(partial)
+    assert restored.columns == []
+    assert restored.formats == {}
+    assert restored.styles == []
+    assert restored.kpis == []
+    assert restored.meta.title is None
+
+
+def test_set_format_invalid_kind_raises():
+    rep = Report([{"a": 1}])
+    with pytest.raises(ValueError, match="kind"):
+        rep.set_format("a", kind="bogus")
+
+
+def test_add_style_invalid_when_raises():
+    rep = Report([{"a": 1}])
+    with pytest.raises(ValueError, match="when"):
+        rep.add_style("a", when="bogus", color="red")

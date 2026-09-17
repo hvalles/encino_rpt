@@ -145,6 +145,12 @@ class Report:
         Returns:
             El propio reporte (fluido).
         """
+        if kind not in ("number", "currency", "percent", "date"):
+            raise ValueError(f"kind inválido: {kind!r}")
+        if symbol_position not in ("prefix", "suffix"):
+            raise ValueError(f"symbol_position inválido: {symbol_position!r}")
+        if negative not in ("minus", "paren"):
+            raise ValueError(f"negative inválido: {negative!r}")
         self._formats[column] = Format(
             kind=kind,
             decimals=decimals,
@@ -176,6 +182,8 @@ class Report:
         Returns:
             El propio reporte (fluido).
         """
+        if when not in ("lt", "le", "gt", "ge", "eq", "ne"):
+            raise ValueError(f"when inválido: {when!r}")
         self._styles.append(
             ConditionalRule(column=column, when=when, value=value, style=style)
         )

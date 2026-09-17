@@ -50,20 +50,15 @@ def to_jsonable(obj: Any) -> Any:
     return obj
 
 
-def _discriminator(cls: type) -> Any:
-    for f in dataclasses.fields(cls):
-        if f.name == "type":
-            return f.default
-    return None
-
-
 def _build(cls: type, data: dict):
     hints = get_type_hints(cls)
     kwargs: dict[str, Any] = {}
     for f in dataclasses.fields(cls):
         if not f.init:
             continue
-        kwargs[f.name] = _coerce(data.get(f.name), hints[f.name])
+        if f.name not in data:
+            continue  # clave ausente: deja el default del dataclass (default_factory)
+        kwargs[f.name] = _coerce(data[f.name], hints[f.name])
     return cls(**kwargs)
 
 
